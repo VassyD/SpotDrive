@@ -850,11 +850,10 @@ function FeedScreen({ onSpotTap }) {
 }
 
 function ProfileScreen() {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, fetchProfile } = useAuth();
   const [spots,    setSpots]    = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [signingOut, setSigningOut] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -874,11 +873,11 @@ function ProfileScreen() {
       <div style={{ background:`linear-gradient(180deg,${T.accentDm} 0%,${T.surface} 100%)`,
         padding:"24px 16px 0" }}>
         <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:12 }}>
-          <button onClick={() => setShowSettings(true)}
+          <button onClick={handleSignOut} disabled={signingOut}
             style={{ fontSize:12, color:T.muted, border:`1px solid ${T.border}`,
               borderRadius:8, padding:"6px 12px", background:"none",
               display:"flex", alignItems:"center", gap:6 }}>
-            ⚙️
+            {signingOut ? <Spinner size={12} /> : "Sign Out"}
           </button>
         </div>
 
@@ -1166,6 +1165,4 @@ export default function App() {
     </AuthProvider>
   );
 }
-
-
 
