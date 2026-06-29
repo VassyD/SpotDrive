@@ -1165,4 +1165,3 @@ export default function App() {
     </AuthProvider>
   );
 }
-// settings update 
