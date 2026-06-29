@@ -132,7 +132,7 @@ function AuthProvider({ children }) {
         avatar_url:   null,
         bio:          "",
       });
-      // trigger handles this
+      if (profileError) throw profileError;
       await fetchProfile(data.user.id);
     }
     return data;
