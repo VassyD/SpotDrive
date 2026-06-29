@@ -877,7 +877,7 @@ function ProfileScreen() {
             style={{ fontSize:12, color:T.muted, border:`1px solid ${T.border}`,
               borderRadius:8, padding:"6px 12px", background:"none",
               display:"flex", alignItems:"center", gap:6 }}>
-            {signingOut ? <Spinner size={12} /> : "Sign Out"}
+            ⚙️
           </button>
         </div>
 
