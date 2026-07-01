@@ -2424,17 +2424,282 @@ function NotificationsScreen() {
   );
 }
 
+// ─── SEARCH SCREEN ────────────────────────────────────────────
+function SearchScreen() {
+  const { user } = useAuth();
+  const [query,        setQuery]        = useState("");
+  const [results,      setResults]      = useState([]);
+  const [loading,      setLoading]      = useState(false);
+  const [searched,     setSearched]     = useState(false);
+  const [viewProfile,  setViewProfile]  = useState(null);
+  const [recentSearches, setRecentSearches] = useState(
+    ["jdm_tokyo", "euro_spotter", "apex_hunter"]
+  );
+  const inputRef = useRef(null);
+  const debounceRef = useRef(null);
+
+  const TRENDING = [
+    { handle:"jdm_tokyo",    display_name:"Kenji Tanaka",   followers_count:91000, initials:"KT", badge:"🏆" },
+    { handle:"euro_spotter", display_name:"Lena Müller",    followers_count:54200, initials:"LM", badge:"⭐" },
+    { handle:"gulf_spots",   display_name:"Omar Al-Rashid", followers_count:38700, initials:"OR", badge:"🔥" },
+    { handle:"apex_hunter",  display_name:"Tyler Rhodes",   followers_count:18400, initials:"AH", badge:"" },
+    { handle:"la_spotter",   display_name:"Marcus Webb",    followers_count:12100, initials:"MW", badge:"" },
+    { handle:"nring_nut",    display_name:"Hans Fischer",   followers_count:8300,  initials:"HF", badge:"" },
+  ];
+
+  const search = async (q) => {
+    if (!q.trim()) { setResults([]); setSearched(false); return; }
+    setLoading(true); setSearched(true);
+    try {
+      const clean = q.trim().toLowerCase().replace(/^@/, "");
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .or(`handle.ilike.%${clean}%,display_name.ilike.%${clean}%`)
+        .limit(20);
+
+      if (data && data.length > 0) {
+        setResults(data.map(p => ({
+          ...p,
+          initials: (p.handle || "SP").slice(0,2).toUpperCase(),
+        })));
+      } else {
+        // Fall back to mock filtered data
+        const mock = [
+          { id:"m1", handle:"jdm_tokyo",    display_name:"Kenji Tanaka",   followers_count:91000, spots_count:1204, initials:"KT" },
+          { id:"m2", handle:"euro_spotter", display_name:"Lena Müller",    followers_count:54200, spots_count:889,  initials:"LM" },
+          { id:"m3", handle:"gulf_spots",   display_name:"Omar Al-Rashid", followers_count:38700, spots_count:567,  initials:"OR" },
+          { id:"m4", handle:"apex_hunter",  display_name:"Tyler Rhodes",   followers_count:18400, spots_count:412,  initials:"AH" },
+          { id:"m5", handle:"la_spotter",   display_name:"Marcus Webb",    followers_count:12100, spots_count:203,  initials:"MW" },
+          { id:"m6", handle:"nring_nut",    display_name:"Hans Fischer",   followers_count:8300,  spots_count:145,  initials:"HF" },
+        ];
+        setResults(mock.filter(p =>
+          p.handle.includes(clean) || p.display_name.toLowerCase().includes(clean)
+        ));
+      }
+    } catch(e) { console.error(e); }
+    finally { setLoading(false); }
+  };
+
+  const handleChange = (val) => {
+    setQuery(val);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => search(val), 300);
+  };
+
+  const handleSelect = (handle) => {
+    setViewProfile(handle);
+    setRecentSearches(r => [handle, ...r.filter(x => x !== handle)].slice(0, 5));
+  };
+
+  const clearSearch = () => { setQuery(""); setResults([]); setSearched(false); inputRef.current?.focus(); };
+
+  // Focus input on mount
+  useEffect(() => { setTimeout(() => inputRef.current?.focus(), 100); }, []);
+
+  const SpotterRow = ({ spotter, badge }) => (
+    <div onClick={() => handleSelect(spotter.handle)}
+      style={{ display:"flex", alignItems:"center", gap:12,
+        padding:"12px 16px", cursor:"pointer", borderBottom:"1px solid #252530" }}
+      className="row-hover">
+      <Avatar initials={spotter.initials || spotter.handle?.slice(0,2).toUpperCase() || "SP"}
+        src={spotter.avatar_url} size={46} />
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+          <span style={{ fontSize:14, fontWeight:700, color:"#F2EEE8",
+            overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+            {spotter.display_name || spotter.handle}
+          </span>
+          {badge && <span style={{ fontSize:13 }}>{badge}</span>}
+        </div>
+        <div style={{ fontSize:12, color:"#6B6878" }}>@{spotter.handle}</div>
+        <div style={{ display:"flex", gap:10, marginTop:2 }}>
+          <span style={{ fontSize:11, color:"#6B6878" }}>
+            <span style={{ color:"#F2EEE8", fontWeight:600 }}>{fmt(spotter.followers_count||0)}</span> followers
+          </span>
+          {spotter.spots_count > 0 && (
+            <span style={{ fontSize:11, color:"#6B6878" }}>
+              <span style={{ color:"#F2EEE8", fontWeight:600 }}>{spotter.spots_count}</span> spots
+            </span>
+          )}
+        </div>
+      </div>
+      <FollowButton targetUserId={spotter.id} targetHandle={spotter.handle} size="sm" />
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Search bar */}
+      <div style={{ padding:"12px 14px", borderBottom:"1px solid #252530",
+        position:"sticky", top:0, background:"#0A0A0C", zIndex:10 }}>
+        <div style={{ position:"relative" }}>
+          <span style={{ position:"absolute", left:13, top:"50%",
+            transform:"translateY(-50%)", fontSize:16, color:"#6B6878" }}>🔍</span>
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={e => handleChange(e.target.value)}
+            placeholder="Search by name or @handle…"
+            style={{ width:"100%", background:"#18181F", border:"1.5px solid #252530",
+              borderRadius:14, padding:"11px 40px 11px 40px", color:"#F2EEE8",
+              fontSize:14, outline:"none", transition:"border-color .15s",
+              ...(query ? { borderColor:"#E8430A", boxShadow:"0 0 0 3px #2D1200" } : {}) }} />
+          {query && (
+            <button onClick={clearSearch}
+              style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)",
+                background:"#252530", border:"none", borderRadius:"50%",
+                width:22, height:22, display:"flex", alignItems:"center",
+                justifyContent:"center", color:"#AAA6A0", fontSize:13,
+                cursor:"pointer", lineHeight:1 }}>×</button>
+          )}
+        </div>
+      </div>
+
+      {/* Results */}
+      {query && (
+        <div>
+          {loading ? (
+            Array(4).fill(0).map((_,i) => (
+              <div key={i} style={{ display:"flex", gap:12, padding:"12px 16px",
+                borderBottom:"1px solid #252530", alignItems:"center" }}>
+                <div className="shimmer" style={{ width:46, height:46, borderRadius:"50%", flexShrink:0 }} />
+                <div style={{ flex:1, display:"flex", flexDirection:"column", gap:6 }}>
+                  <div className="shimmer" style={{ height:13, width:"45%" }} />
+                  <div className="shimmer" style={{ height:11, width:"28%" }} />
+                  <div className="shimmer" style={{ height:10, width:"35%" }} />
+                </div>
+              </div>
+            ))
+          ) : results.length === 0 ? (
+            <div style={{ textAlign:"center", padding:"60px 20px" }}>
+              <div style={{ fontSize:40, marginBottom:12 }}>🔍</div>
+              <div style={{ fontSize:16, fontWeight:700, color:"#F2EEE8", marginBottom:6 }}>
+                No spotters found
+              </div>
+              <div style={{ fontSize:13, color:"#6B6878" }}>
+                Try searching by name or @handle
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ padding:"10px 16px 6px", fontSize:11, fontWeight:700,
+                color:"#6B6878", textTransform:"uppercase", letterSpacing:".06em" }}>
+                {results.length} result{results.length !== 1 ? "s" : ""}
+              </div>
+              {results.map(s => <SpotterRow key={s.id || s.handle} spotter={s} />)}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Empty state — recent + trending */}
+      {!query && (
+        <div>
+          {/* Recent searches */}
+          {recentSearches.length > 0 && (
+            <div style={{ marginBottom:8 }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
+                padding:"14px 16px 8px" }}>
+                <div style={{ fontSize:13, fontWeight:700, color:"#F2EEE8" }}>Recent</div>
+                <button onClick={() => setRecentSearches([])}
+                  style={{ fontSize:12, color:"#E8430A", fontWeight:600,
+                    background:"none", border:"none", cursor:"pointer" }}>
+                  Clear all
+                </button>
+              </div>
+              {recentSearches.map(h => (
+                <div key={h} onClick={() => { setQuery(`@${h}`); search(h); }}
+                  style={{ display:"flex", alignItems:"center", gap:12,
+                    padding:"10px 16px", cursor:"pointer", borderBottom:"1px solid #252530" }}>
+                  <div style={{ width:34, height:34, borderRadius:"50%", background:"#18181F",
+                    border:"1px solid #252530", display:"flex", alignItems:"center",
+                    justifyContent:"center", fontSize:16, flexShrink:0 }}>🕐</div>
+                  <span style={{ fontSize:14, color:"#AAA6A0", flex:1 }}>@{h}</span>
+                  <button onClick={e => { e.stopPropagation(); setRecentSearches(r => r.filter(x => x !== h)); }}
+                    style={{ background:"none", border:"none", color:"#6B6878",
+                      fontSize:18, cursor:"pointer", lineHeight:1 }}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Trending spotters */}
+          <div>
+            <div style={{ padding:"14px 16px 8px", display:"flex", alignItems:"center", gap:8 }}>
+              <span style={{ fontSize:14 }}>🔥</span>
+              <div style={{ fontSize:13, fontWeight:700, color:"#F2EEE8" }}>Top Spotters</div>
+            </div>
+            {TRENDING.map((s, i) => (
+              <div key={s.handle} onClick={() => handleSelect(s.handle)}
+                style={{ display:"flex", alignItems:"center", gap:12,
+                  padding:"11px 16px", cursor:"pointer", borderBottom:"1px solid #252530" }}>
+                {/* Rank */}
+                <div style={{ width:22, textAlign:"center", flexShrink:0,
+                  fontFamily:"'Barlow Condensed',sans-serif", fontSize:15, fontWeight:900,
+                  color: i===0?"#C9A84C":i===1?"#AAA6A0":i===2?"#CD7F32":"#3D3D4E" }}>
+                  {i+1}
+                </div>
+                <Avatar initials={s.initials} size={44} />
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+                    <span style={{ fontSize:14, fontWeight:700, color:"#F2EEE8" }}>
+                      {s.display_name}
+                    </span>
+                    {s.badge && <span style={{ fontSize:12 }}>{s.badge}</span>}
+                  </div>
+                  <div style={{ fontSize:12, color:"#6B6878" }}>
+                    @{s.handle} · <span style={{ color:"#F2EEE8", fontWeight:600 }}>{fmt(s.followers_count)}</span> followers
+                  </div>
+                </div>
+                <span style={{ fontSize:18, color:"#3D3D4E" }}>›</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Search tips */}
+          <div style={{ margin:"20px 16px", padding:"14px 16px",
+            background:"#14141A", border:"1px solid #252530", borderRadius:12 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:"#6B6878",
+              textTransform:"uppercase", letterSpacing:".06em", marginBottom:10 }}>
+              Search Tips
+            </div>
+            {[
+              { icon:"@",   tip:'Type @handle to find a specific spotter' },
+              { icon:"🔤",  tip:'Search by first or last name' },
+              { icon:"🏎",  tip:'Car makes and models coming soon' },
+              { icon:"📍",  tip:'Location search coming soon' },
+            ].map(({ icon, tip }) => (
+              <div key={tip} style={{ display:"flex", gap:10, alignItems:"center",
+                padding:"6px 0", borderBottom:"1px solid #252530" }}>
+                <span style={{ fontSize:14, width:20, textAlign:"center" }}>{icon}</span>
+                <span style={{ fontSize:12, color:"#6B6878" }}>{tip}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Spotter profile sheet */}
+      {viewProfile && (
+        <SpotterProfileSheet handle={viewProfile} onClose={() => setViewProfile(null)} />
+      )}
+    </div>
+  );
+}
+
 function MainApp() {
-  const [screen,     setScreen]     = useState("feed");
-  const [showNotifs, setShowNotifs] = useState(false);
+  const [screen,      setScreen]      = useState("feed");
+  const [showNotifs,  setShowNotifs]  = useState(false);
   const [unreadCount, setUnreadCount] = useState(3);
-  const [spotDetail, setSpotDetail] = useState(null);
-  const [showUpload, setShowUpload] = useState(false);
+  const [spotDetail,  setSpotDetail]  = useState(null);
+  const [showUpload,  setShowUpload]  = useState(false);
 
   const NAV = [
     { key:"feed",    label:"Feed",    icon:"🏠" },
     { key:"explore", label:"Explore", icon:"🧭" },
     { key:"upload",  label:"",        icon:null  },
+    { key:"search",  label:"Search",  icon:"🔍"  },
     { key:"profile", label:"Profile", icon:"👤"  },
   ];
 
@@ -2477,6 +2742,7 @@ function MainApp() {
       <main style={{ flex:1, overflowY:"auto", paddingBottom:80 }}>
         {screen==="feed"    && <FeedScreen    onSpotTap={setSpotDetail} />}
         {screen==="explore" && <ExploreScreen onSpotTap={setSpotDetail} />}
+        {screen==="search"  && <SearchScreen />}
         {screen==="profile" && <ProfileScreen />}
       </main>
 
