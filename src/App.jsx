@@ -432,6 +432,104 @@ function SpotCard({ spot, onTap }) {
 }
 
 // ─── UPLOAD MODAL ─────────────────────────────────────────────
+// ─── CAR MAKES DATABASE ───────────────────────────────────────
+const CAR_MAKES = [
+  "Aston Martin","Audi","Bentley","BMW","Bugatti","Chevrolet","Ferrari",
+  "Ford","Koenigsegg","Lamborghini","Lotus","Maserati","McLaren","Mercedes-Benz",
+  "Nissan","Pagani","Porsche","Rolls-Royce","Tesla","Toyota","Volkswagen",
+];
+const CAR_MODELS = {
+  "Ferrari":       ["296 GTB","488 Pista","812 Superfast","F8 Tributo","LaFerrari","Roma","SF90 Stradale"],
+  "Lamborghini":   ["Aventador SVJ","Huracán STO","Huracán Tecnica","Reventón","Sián","Urus"],
+  "Bugatti":       ["Chiron","Chiron Super Sport","Divo","Mistral","Veyron","Veyron Super Sport"],
+  "McLaren":       ["600LT","720S","765LT","Artura","P1","Senna"],
+  "Porsche":       ["911 GT2 RS","911 GT3","911 GT3 RS","918 Spyder","Cayenne Turbo","Taycan Turbo S"],
+  "Aston Martin":  ["DB11","DBS Superleggera","DBX","Valkyrie","Vantage"],
+  "Pagani":        ["Huayra","Huayra BC","Huayra R","Zonda"],
+  "Koenigsegg":    ["Agera RS","CC850","Gemera","Jesko","One:1","Regera"],
+  "Rolls-Royce":   ["Cullinan","Dawn","Ghost","Phantom","Spectre","Wraith"],
+  "Bentley":       ["Bentayga","Continental GT","Flying Spur","Mulsanne"],
+  "BMW":           ["M2","M3 CSL","M4 CSL","M5 CS","M8 Competition","XM"],
+  "Mercedes-Benz": ["AMG GT Black Series","AMG ONE","C63 AMG","G63 AMG","GLE 63","SL 63"],
+  "Nissan":        ["GT-R","GT-R Nismo","GT-R R34","GT-R R35 Track Edition"],
+  "Audi":          ["R8 V10","R8 V10 Performance","RS3","RS6 Avant","RS7","TT RS"],
+};
+
+function MakeInput({ value, onChange, placeholder }) {
+  const [suggestions, setSuggestions] = useState([]);
+  const [open, setOpen] = useState(false);
+
+  const handleChange = (v) => {
+    onChange(v);
+    if (v.length < 1) { setSuggestions([]); setOpen(false); return; }
+    const matches = CAR_MAKES.filter(m => m.toLowerCase().startsWith(v.toLowerCase()));
+    setSuggestions(matches);
+    setOpen(matches.length > 0);
+  };
+
+  return (
+    <div style={{ position:"relative" }}>
+      <input className="sd-input" value={value} placeholder={placeholder}
+        onChange={e => handleChange(e.target.value)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)} />
+      {open && (
+        <div style={{ position:"absolute", top:"calc(100% + 4px)", left:0, right:0,
+          background:"#1C1C24", border:"1px solid #252530", borderRadius:10,
+          zIndex:50, overflow:"hidden", boxShadow:"0 8px 24px rgba(0,0,0,.5)" }}>
+          {suggestions.map(s => (
+            <button key={s} onMouseDown={() => { onChange(s); setOpen(false); }}
+              style={{ width:"100%", padding:"10px 14px", background:"none",
+                border:"none", borderBottom:"1px solid #252530",
+                color:"#F2EEE8", fontSize:14, textAlign:"left", cursor:"pointer" }}>
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ModelInput({ make, value, onChange, placeholder }) {
+  const [suggestions, setSuggestions] = useState([]);
+  const [open, setOpen] = useState(false);
+  const models = CAR_MODELS[make] || [];
+
+  const handleChange = (v) => {
+    onChange(v);
+    if (v.length < 1) {
+      setSuggestions(models); setOpen(models.length > 0); return;
+    }
+    const matches = models.filter(m => m.toLowerCase().includes(v.toLowerCase()));
+    setSuggestions(matches); setOpen(matches.length > 0);
+  };
+
+  return (
+    <div style={{ position:"relative" }}>
+      <input className="sd-input" value={value} placeholder={placeholder}
+        onChange={e => handleChange(e.target.value)}
+        onFocus={() => { if (models.length > 0 && !value) { setSuggestions(models); setOpen(true); } }}
+        onBlur={() => setTimeout(() => setOpen(false), 150)} />
+      {open && (
+        <div style={{ position:"absolute", top:"calc(100% + 4px)", left:0, right:0,
+          background:"#1C1C24", border:"1px solid #252530", borderRadius:10,
+          zIndex:50, overflow:"hidden", maxHeight:160, overflowY:"auto",
+          boxShadow:"0 8px 24px rgba(0,0,0,.5)" }}>
+          {suggestions.map(s => (
+            <button key={s} onMouseDown={() => { onChange(s); setOpen(false); }}
+              style={{ width:"100%", padding:"10px 14px", background:"none",
+                border:"none", borderBottom:"1px solid #252530",
+                color:"#F2EEE8", fontSize:13, textAlign:"left", cursor:"pointer" }}>
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── UPLOAD MODAL (with autocomplete) ─────────────────────────
 function UploadModal({ onClose }) {
   const { user } = useAuth();
   const [step,    setStep]    = useState(1);
@@ -515,12 +613,27 @@ function UploadModal({ onClose }) {
           ) : (
             <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
               {preview && <img src={preview} alt="preview" style={{ width:"100%", height:180, objectFit:"cover", borderRadius:12 }} />}
-              {[{key:"make",label:"Make",ph:"Ferrari"},{key:"model",label:"Model",ph:"SF90 Stradale"},{key:"year",label:"Year",ph:"2023"},{key:"location",label:"Location",ph:"Monaco, Monte Carlo"}].map(({key,label,ph}) => (
+
+              {/* Make — autocomplete */}
+              <div>
+                <label style={{ fontSize:11, color:"#6B6878", fontWeight:600, textTransform:"uppercase", letterSpacing:".05em", display:"block", marginBottom:5 }}>Make</label>
+                <MakeInput value={form.make} onChange={v => setForm(p=>({...p, make:v, model:""}))} placeholder="Ferrari" />
+              </div>
+
+              {/* Model — autocomplete based on make */}
+              <div>
+                <label style={{ fontSize:11, color:"#6B6878", fontWeight:600, textTransform:"uppercase", letterSpacing:".05em", display:"block", marginBottom:5 }}>Model</label>
+                <ModelInput make={form.make} value={form.model} onChange={v => setForm(p=>({...p, model:v}))} placeholder="SF90 Stradale" />
+              </div>
+
+              {/* Year + Location */}
+              {[{key:"year",label:"Year",ph:"2023"},{key:"location",label:"Location",ph:"Monaco, Monte Carlo"}].map(({key,label,ph}) => (
                 <div key={key}>
                   <label style={{ fontSize:11, color:"#6B6878", fontWeight:600, textTransform:"uppercase", letterSpacing:".05em", display:"block", marginBottom:5 }}>{label}</label>
                   <input className="sd-input" value={form[key]} placeholder={ph} onChange={e=>setForm(p=>({...p,[key]:e.target.value}))} />
                 </div>
               ))}
+
               <div>
                 <label style={{ fontSize:11, color:"#6B6878", fontWeight:600, textTransform:"uppercase", letterSpacing:".05em", display:"block", marginBottom:5 }}>Rarity</label>
                 <div style={{ display:"flex", gap:8 }}>
@@ -545,6 +658,7 @@ function UploadModal({ onClose }) {
     </div>
   );
 }
+
 
 // ─── SETTINGS SHEET ───────────────────────────────────────────
 function SettingsSheet({ onClose, onEditProfile, onChangePhoto, onPrivacy, onNotifications }) {
@@ -1629,6 +1743,9 @@ function FeedScreen({ onSpotTap }) {
   const [spots,      setSpots]      = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [showStoryUpload, setShowStoryUpload] = useState(false);
+  const [showPushBanner,  setShowPushBanner]  = useState(() =>
+    typeof Notification !== "undefined" && Notification.permission === "default"
+  );
 
   useEffect(() => {
     const load = async () => {
@@ -1660,6 +1777,9 @@ function FeedScreen({ onSpotTap }) {
     <div>
       {/* Stories row */}
       <StoriesRow profile={profile} onAddStory={() => setShowStoryUpload(true)} />
+
+      {/* Push notification banner */}
+      {showPushBanner && <PushNotificationBanner onDismiss={() => setShowPushBanner(false)} />}
 
       {/* Trending banner */}
       <div style={{ margin:"10px 14px", padding:"10px 14px", background:"#2D1200",
@@ -2101,6 +2221,7 @@ function ProfileScreen() {
   const [showPrivacy,       setShowPrivacy]       = useState(false);
   const [showNotifSettings, setShowNotifSettings] = useState(false);
   const [uploadingPhoto,    setUploadingPhoto]    = useState(false);
+  const [editingSpot,       setEditingSpot]       = useState(null);
   const avatarRef = useRef(null);
 
   useEffect(() => {
@@ -2200,18 +2321,30 @@ function ProfileScreen() {
           <div style={{ fontSize:13, color:"#6B6878" }}>Hit the + button to post your first spot.</div>
         </div>
       ) : (
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:2, padding:2 }}>
-          {spots.map(s => (
-            <div key={s.id} style={{ aspectRatio:"1", overflow:"hidden", position:"relative" }}>
-              {s.image_url
-                ? <img src={s.image_url} alt="" loading="lazy" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
-                : <div style={{ width:"100%", height:"100%", background:"#2D1200", display:"flex", alignItems:"center", justifyContent:"center", fontSize:28 }}>🏎</div>
-              }
-              <div style={{ position:"absolute", inset:0, background:"linear-gradient(to bottom, transparent 60%, rgba(0,0,0,.7))" }} />
-              <div style={{ position:"absolute", bottom:6, left:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:11, fontWeight:800, color:"#fff", lineHeight:1 }}>{s.make}</div>
-            </div>
-          ))}
-        </div>
+        <>
+          {editingSpot && (
+            <EditSpotModal
+              spot={editingSpot}
+              onClose={() => setEditingSpot(null)}
+              onDeleted={() => { setSpots(ss => ss.filter(s => s.id !== editingSpot.id)); setEditingSpot(null); }}
+            />
+          )}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:2, padding:2 }}>
+            {spots.map(s => (
+              <div key={s.id} style={{ aspectRatio:"1", overflow:"hidden", position:"relative",
+                cursor:"pointer" }} onClick={() => setEditingSpot(s)}>
+                {s.image_url
+                  ? <img src={s.image_url} alt="" loading="lazy" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                  : <div style={{ width:"100%", height:"100%", background:"#2D1200", display:"flex", alignItems:"center", justifyContent:"center", fontSize:28 }}>🏎</div>
+                }
+                <div style={{ position:"absolute", inset:0, background:"linear-gradient(to bottom, transparent 60%, rgba(0,0,0,.7))" }} />
+                <div style={{ position:"absolute", bottom:4, left:4, fontFamily:"'Barlow Condensed',sans-serif", fontSize:11, fontWeight:800, color:"#fff" }}>{s.make}</div>
+                <div style={{ position:"absolute", top:4, right:4, background:"rgba(0,0,0,.5)",
+                  borderRadius:5, padding:"2px 4px", fontSize:9, color:"rgba(255,255,255,.6)" }}>✏️</div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
@@ -2696,11 +2829,11 @@ function MainApp() {
   const [showUpload,  setShowUpload]  = useState(false);
 
   const NAV = [
-    { key:"feed",    label:"Feed",    icon:"🏠" },
-    { key:"explore", label:"Explore", icon:"🧭" },
-    { key:"upload",  label:"",        icon:null  },
-    { key:"search",  label:"Search",  icon:"🔍"  },
-    { key:"profile", label:"Profile", icon:"👤"  },
+    { key:"feed",        label:"Feed",        icon:"🏠" },
+    { key:"explore",     label:"Explore",     icon:"🧭" },
+    { key:"upload",      label:"",            icon:null  },
+    { key:"leaderboard", label:"Ranks",       icon:"🏆"  },
+    { key:"profile",     label:"Profile",     icon:"👤"  },
   ];
 
   return (
@@ -2740,10 +2873,10 @@ function MainApp() {
       </header>
 
       <main style={{ flex:1, overflowY:"auto", paddingBottom:80 }}>
-        {screen==="feed"    && <FeedScreen    onSpotTap={setSpotDetail} />}
-        {screen==="explore" && <ExploreScreen onSpotTap={setSpotDetail} />}
-        {screen==="search"  && <SearchScreen />}
-        {screen==="profile" && <ProfileScreen />}
+        {screen==="feed"        && <FeedScreen    onSpotTap={setSpotDetail} />}
+        {screen==="explore"     && <ExploreScreen onSpotTap={setSpotDetail} />}
+        {screen==="leaderboard" && <LeaderboardScreen />}
+        {screen==="profile"     && <ProfileScreen />}
       </main>
 
       <nav style={{ position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)",
@@ -2864,6 +2997,7 @@ function CommentsSheet({ spot, onClose }) {
   const [liked,     setLiked]     = useState(spot.liked || false);
   const [likes,     setLikes]     = useState(spot.likes || 0);
   const [saved,     setSaved]     = useState(spot.saved || false);
+  const [showShare, setShowShare] = useState(false);
   const [imgErr,    setImgErr]    = useState(false);
   const inputRef  = useRef(null);
   const bottomRef = useRef(null);
@@ -3022,10 +3156,13 @@ function CommentsSheet({ spot, onClose }) {
                   fontSize:13, fontWeight:600, border:"none", background:"none", cursor:"pointer" }}>
                 {saved?"🔖":"📎"} {fmt(spot.saves)}
               </button>
-              <button style={{ marginLeft:"auto", color:"#6B6878", border:"none", background:"none", fontSize:14 }}>
+              <button onClick={() => setShowShare(true)}
+                style={{ marginLeft:"auto", color:"#6B6878", border:"none",
+                  background:"none", fontSize:14, cursor:"pointer" }}>
                 ↗
               </button>
             </div>
+            {showShare && <ShareSheet spot={spot} onClose={() => setShowShare(false)} />}
 
             {/* Description */}
             {spot.description && (
@@ -3107,8 +3244,643 @@ function CommentsSheet({ spot, onClose }) {
 }
 
 // ─── ROOT ─────────────────────────────────────────────────────
+// ─── LEADERBOARD SCREEN ───────────────────────────────────────
+function LeaderboardScreen() {
+  const { user } = useAuth();
+  const [tab,     setTab]     = useState("global"); // global | city | hypercar | exotic | sports
+  const [spotters,setSpotters]= useState([]);
+  const [loading, setLoading] = useState(true);
+  const [viewProfile, setViewProfile] = useState(null);
+
+  const MOCK_LEADERS = {
+    global: [
+      { rank:1,  handle:"jdm_tokyo",    display_name:"Kenji Tanaka",   spots:1204, followers:91000,  score:48200, streak:23, badge:"🏆", initials:"KT" },
+      { rank:2,  handle:"euro_spotter", display_name:"Lena Müller",    spots:889,  followers:54200,  score:41800, streak:15, badge:"🥈", initials:"LM" },
+      { rank:3,  handle:"gulf_spots",   display_name:"Omar Al-Rashid", spots:567,  followers:38700,  score:36100, streak:8,  badge:"🥉", initials:"OR" },
+      { rank:4,  handle:"apex_hunter",  display_name:"Tyler Rhodes",   spots:412,  followers:18400,  score:28400, streak:12, badge:"",   initials:"AH" },
+      { rank:5,  handle:"la_spotter",   display_name:"Marcus Webb",    spots:203,  followers:12100,  score:19200, streak:5,  badge:"",   initials:"MW" },
+      { rank:6,  handle:"nring_nut",    display_name:"Hans Fischer",   spots:145,  followers:8300,   score:12800, streak:3,  badge:"",   initials:"HF" },
+    ],
+    city: [
+      { rank:1,  handle:"jdm_tokyo",    display_name:"Kenji Tanaka",   city:"Tokyo",        spots:412, score:18200, badge:"🏆", initials:"KT" },
+      { rank:2,  handle:"gulf_spots",   display_name:"Omar Al-Rashid", city:"Dubai",        spots:287, score:14100, badge:"🥈", initials:"OR" },
+      { rank:3,  handle:"euro_spotter", display_name:"Lena Müller",    city:"Monaco",       spots:234, score:12800, badge:"🥉", initials:"LM" },
+      { rank:4,  handle:"apex_hunter",  display_name:"Tyler Rhodes",   city:"Beverly Hills",spots:198, score:10200, badge:"",   initials:"AH" },
+      { rank:5,  handle:"la_spotter",   display_name:"Marcus Webb",    city:"Los Angeles",  spots:167, score:8900,  badge:"",   initials:"MW" },
+    ],
+    hypercar: [
+      { rank:1,  handle:"euro_spotter", display_name:"Lena Müller",    spots:234, score:46800, badge:"🏆", initials:"LM", rarity:"Hypercar" },
+      { rank:2,  handle:"jdm_tokyo",    display_name:"Kenji Tanaka",   spots:198, score:39600, badge:"🥈", initials:"KT", rarity:"Hypercar" },
+      { rank:3,  handle:"gulf_spots",   display_name:"Omar Al-Rashid", spots:156, score:31200, badge:"🥉", initials:"OR", rarity:"Hypercar" },
+    ],
+    exotic: [
+      { rank:1,  handle:"apex_hunter",  display_name:"Tyler Rhodes",   spots:312, score:28100, badge:"🏆", initials:"AH", rarity:"Exotic" },
+      { rank:2,  handle:"gulf_spots",   display_name:"Omar Al-Rashid", spots:289, score:26000, badge:"🥈", initials:"OR", rarity:"Exotic" },
+      { rank:3,  handle:"la_spotter",   display_name:"Marcus Webb",    spots:201, score:18100, badge:"🥉", initials:"MW", rarity:"Exotic" },
+    ],
+    sports: [
+      { rank:1,  handle:"nring_nut",    display_name:"Hans Fischer",   spots:445, score:22300, badge:"🏆", initials:"HF", rarity:"Sports" },
+      { rank:2,  handle:"jdm_tokyo",    display_name:"Kenji Tanaka",   spots:389, score:19500, badge:"🥈", initials:"KT", rarity:"Sports" },
+      { rank:3,  handle:"apex_hunter",  display_name:"Tyler Rhodes",   spots:301, score:15100, badge:"🥉", initials:"AH", rarity:"Sports" },
+    ],
+  };
+
+  useEffect(() => {
+    setLoading(true);
+    const load = async () => {
+      // Try Supabase first
+      const { data } = await supabase.from("profiles")
+        .select("*").order("followers_count", { ascending:false }).limit(10);
+      if (data && data.length > 0) {
+        setSpotters(data.map((p, i) => ({
+          rank: i+1, handle:p.handle, display_name:p.display_name||p.handle,
+          spots:p.spots_count||0, followers:p.followers_count||0,
+          score: (p.followers_count||0)*2 + (p.spots_count||0)*10,
+          badge: i===0?"🏆":i===1?"🥈":i===2?"🥉":"",
+          initials:(p.handle||"SP").slice(0,2).toUpperCase(),
+          streak:0,
+        })));
+      } else {
+        setSpotters(MOCK_LEADERS[tab] || MOCK_LEADERS.global);
+      }
+      setLoading(false);
+    };
+    load();
+  }, [tab]);
+
+  const leaders = spotters.length > 0 ? spotters : (MOCK_LEADERS[tab] || []);
+
+  const TABS = [
+    { key:"global",   label:"🌍 Global"   },
+    { key:"city",     label:"🏙️ City"     },
+    { key:"hypercar", label:"👑 Hypercar" },
+    { key:"exotic",   label:"🔥 Exotic"   },
+    { key:"sports",   label:"🏁 Sports"   },
+  ];
+
+  const RC = { Hypercar:"#b388ff", Exotic:"#E8430A", Sports:"#60a5fa" };
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ padding:"16px 16px 12px", borderBottom:"1px solid #252530" }}>
+        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:22,
+          fontWeight:900, color:"#F2EEE8", marginBottom:4 }}>
+          🏆 Leaderboard
+        </div>
+        <div style={{ fontSize:12, color:"#6B6878" }}>
+          Resets every Monday · Based on spots, likes & followers
+        </div>
+      </div>
+
+      {/* Tab bar */}
+      <div style={{ display:"flex", overflowX:"auto", borderBottom:"1px solid #252530",
+        scrollbarWidth:"none" }}>
+        {TABS.map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)}
+            style={{ padding:"10px 14px", fontSize:12, fontWeight:700,
+              whiteSpace:"nowrap", background:"none", border:"none", cursor:"pointer",
+              color: tab===t.key ? "#E8430A" : "#6B6878",
+              borderBottom: tab===t.key ? "2px solid #E8430A" : "2px solid transparent" }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Top 3 podium */}
+      {!loading && leaders.length >= 3 && (
+        <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"center",
+          gap:12, padding:"24px 16px 16px",
+          background:"linear-gradient(180deg,#1C0800 0%,#0A0A0C 100%)" }}>
+          {/* 2nd */}
+          <div style={{ flex:1, textAlign:"center" }}>
+            <Avatar initials={leaders[1].initials} src={leaders[1].avatar_url} size={52} />
+            <div style={{ height:60, background:"#AAA6A030",
+              border:"1px solid #AAA6A040", borderRadius:"8px 8px 0 0",
+              marginTop:8, display:"flex", alignItems:"center",
+              justifyContent:"center", fontSize:20 }}>🥈</div>
+            <div style={{ fontSize:11, fontWeight:700, color:"#F2EEE8",
+              marginTop:4, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+              {leaders[1].display_name?.split(" ")[0]}
+            </div>
+            <div style={{ fontSize:10, color:"#AAA6A0" }}>{leaders[1].score?.toLocaleString()} pts</div>
+          </div>
+          {/* 1st */}
+          <div style={{ flex:1, textAlign:"center" }}>
+            <div style={{ position:"relative", display:"inline-block" }}>
+              <Avatar initials={leaders[0].initials} src={leaders[0].avatar_url} size={64} ring />
+              <div style={{ position:"absolute", top:-10, left:"50%",
+                transform:"translateX(-50%)", fontSize:22 }}>👑</div>
+            </div>
+            <div style={{ height:80, background:"#C9A84C20",
+              border:"1px solid #C9A84C50", borderRadius:"8px 8px 0 0",
+              marginTop:8, display:"flex", alignItems:"center",
+              justifyContent:"center", fontSize:24 }}>🏆</div>
+            <div style={{ fontSize:12, fontWeight:800, color:"#C9A84C",
+              marginTop:4, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+              {leaders[0].display_name?.split(" ")[0]}
+            </div>
+            <div style={{ fontSize:11, color:"#C9A84C" }}>{leaders[0].score?.toLocaleString()} pts</div>
+          </div>
+          {/* 3rd */}
+          <div style={{ flex:1, textAlign:"center" }}>
+            <Avatar initials={leaders[2].initials} src={leaders[2].avatar_url} size={44} />
+            <div style={{ height:44, background:"#CD7F3220",
+              border:"1px solid #CD7F3240", borderRadius:"8px 8px 0 0",
+              marginTop:8, display:"flex", alignItems:"center",
+              justifyContent:"center", fontSize:18 }}>🥉</div>
+            <div style={{ fontSize:11, fontWeight:700, color:"#F2EEE8",
+              marginTop:4, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+              {leaders[2].display_name?.split(" ")[0]}
+            </div>
+            <div style={{ fontSize:10, color:"#CD7F32" }}>{leaders[2].score?.toLocaleString()} pts</div>
+          </div>
+        </div>
+      )}
+
+      {/* Full list */}
+      <div style={{ padding:"0 14px 80px" }}>
+        {loading ? (
+          Array(5).fill(0).map((_,i) => (
+            <div key={i} style={{ display:"flex", gap:12, padding:"12px 0",
+              borderBottom:"1px solid #252530", alignItems:"center" }}>
+              <div className="shimmer" style={{ width:36, height:36, borderRadius:"50%" }} />
+              <div style={{ flex:1, display:"flex", flexDirection:"column", gap:6 }}>
+                <div className="shimmer" style={{ height:12, width:"45%" }} />
+                <div className="shimmer" style={{ height:10, width:"30%" }} />
+              </div>
+            </div>
+          ))
+        ) : leaders.map((s, i) => (
+          <div key={s.handle} onClick={() => setViewProfile(s.handle)}
+            style={{ display:"flex", alignItems:"center", gap:12,
+              padding:"12px 0", borderBottom:"1px solid #252530", cursor:"pointer" }}>
+            <div style={{ width:28, textAlign:"center", flexShrink:0,
+              fontFamily:"'Barlow Condensed',sans-serif", fontSize:16, fontWeight:900,
+              color: i===0?"#C9A84C":i===1?"#AAA6A0":i===2?"#CD7F32":"#3D3D4E" }}>
+              {s.badge || s.rank}
+            </div>
+            <Avatar initials={s.initials} src={s.avatar_url} size={44} />
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:14, fontWeight:700, color:"#F2EEE8",
+                overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                {s.display_name}
+              </div>
+              <div style={{ fontSize:11, color:"#6B6878" }}>
+                @{s.handle}
+                {s.streak > 0 && <span style={{ color:"#E8430A", marginLeft:8 }}>🔥 {s.streak} day streak</span>}
+                {s.city && <span style={{ marginLeft:8 }}>📍 {s.city}</span>}
+              </div>
+            </div>
+            <div style={{ textAlign:"right", flexShrink:0 }}>
+              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:16,
+                fontWeight:900, color: i===0?"#C9A84C":i===1?"#AAA6A0":i===2?"#CD7F32":"#F2EEE8" }}>
+                {s.score?.toLocaleString()}
+              </div>
+              <div style={{ fontSize:10, color:"#6B6878" }}>pts · {s.spots} spots</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {viewProfile && <SpotterProfileSheet handle={viewProfile} onClose={() => setViewProfile(null)} />}
+    </div>
+  );
+}
+
+// ─── SHARE SHEET ──────────────────────────────────────────────
+function ShareSheet({ spot, onClose }) {
+  const [copied, setCopied] = useState(false);
+  const shareUrl = `https://spot-drive.vercel.app/?spot=${spot.id}`;
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for older browsers
+      const el = document.createElement("input");
+      el.value = shareUrl;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const shareNative = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${spot.make} ${spot.model} spotted on SpotDrive`,
+          text: `Check out this ${spot.rarity} spotted in ${spot.location || "the wild"}! 🏎`,
+          url: shareUrl,
+        });
+      } catch(e) { if (e.name !== "AbortError") copyLink(); }
+    } else { copyLink(); }
+  };
+
+  const SHARE_OPTIONS = [
+    { icon:"📋", label:"Copy Link",      action: copyLink,  color:"#F2EEE8" },
+    { icon:"📱", label:"Share via App",  action: shareNative, color:"#22C55E" },
+    { icon:"💬", label:"Share to WhatsApp", action: () => window.open(`https://wa.me/?text=${encodeURIComponent(`🏎 ${spot.make} ${spot.model} spotted! ${shareUrl}`)}`), color:"#25D366" },
+    { icon:"🐦", label:"Share to X",     action: () => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Just spotted a ${spot.rarity} ${spot.make} ${spot.model} on @SpotDrive 🏎🔥`)}&url=${encodeURIComponent(shareUrl)}`), color:"#1DA1F2" },
+  ];
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.8)", zIndex:900,
+      backdropFilter:"blur(8px)", display:"flex", alignItems:"flex-end", justifyContent:"center" }}
+      onClick={e => { if (e.target===e.currentTarget) onClose(); }}>
+      <div style={{ background:"#14141A", width:"100%", maxWidth:430,
+        borderRadius:"20px 20px 0 0", padding:"20px 20px 40px",
+        border:"1px solid #252530", animation:"slideUp .25s ease" }}>
+        <div style={{ width:36, height:4, borderRadius:2, background:"#252530",
+          margin:"0 auto 20px" }} />
+        <div style={{ fontSize:16, fontWeight:800, color:"#F2EEE8", marginBottom:16 }}>Share this spot</div>
+
+        {/* Spot preview */}
+        <div style={{ display:"flex", gap:12, padding:"12px 14px",
+          background:"#18181F", border:"1px solid #252530", borderRadius:12, marginBottom:20 }}>
+          <div style={{ width:56, height:56, borderRadius:10, overflow:"hidden", flexShrink:0 }}>
+            {spot.image
+              ? <img src={spot.image} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+              : <div style={{ width:"100%", height:"100%", background:"#2D1200",
+                  display:"flex", alignItems:"center", justifyContent:"center", fontSize:24 }}>🏎</div>
+            }
+          </div>
+          <div>
+            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:16,
+              fontWeight:900, color:"#F2EEE8" }}>{spot.make} {spot.model}</div>
+            <div style={{ fontSize:12, color:"#6B6878" }}>📍 {spot.location || "Unknown location"}</div>
+            <div style={{ fontSize:11, color:"#6B6878", marginTop:2, fontFamily:"monospace",
+              background:"#252530", borderRadius:4, padding:"2px 6px", display:"inline-block",
+              overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:180 }}>
+              {shareUrl}
+            </div>
+          </div>
+        </div>
+
+        {/* Share options */}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+          {SHARE_OPTIONS.map(({ icon, label, action, color }) => (
+            <button key={label} onClick={action}
+              style={{ padding:"14px 12px", background:"#18181F",
+                border:`1px solid ${color}30`, borderRadius:12,
+                display:"flex", flexDirection:"column", alignItems:"center", gap:6,
+                cursor:"pointer", transition:"all .15s" }}>
+              <span style={{ fontSize:24 }}>{icon}</span>
+              <span style={{ fontSize:12, fontWeight:600,
+                color: label === "Copy Link" && copied ? "#22C55E" : "#F2EEE8" }}>
+                {label === "Copy Link" && copied ? "Copied! ✓" : label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── EDIT SPOT MODAL ──────────────────────────────────────────
+function EditSpotModal({ spot, onClose, onDeleted }) {
+  const { user } = useAuth();
+  const [form,    setForm]    = useState({
+    make:     spot.make     || "",
+    model:    spot.model    || "",
+    location: spot.location_name || spot.location || "",
+    desc:     spot.description   || spot.desc     || "",
+    rarity:   spot.rarity   || "Exotic",
+  });
+  const [saving,   setSaving]   = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirm,  setConfirm]  = useState(false);
+  const [error,    setError]    = useState("");
+  const [saved,    setSaved]    = useState(false);
+
+  const save = async () => {
+    setSaving(true); setError("");
+    try {
+      const { error:err } = await supabase.from("spots")
+        .update({ make:form.make, model:form.model,
+          location_name:form.location, description:form.desc, rarity:form.rarity })
+        .eq("id", spot.id).eq("user_id", user.id);
+      if (err) throw err;
+      setSaved(true);
+      setTimeout(onClose, 1200);
+    } catch(e) { setError(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const del = async () => {
+    setDeleting(true);
+    try {
+      const { error:err } = await supabase.from("spots")
+        .delete().eq("id", spot.id).eq("user_id", user.id);
+      if (err) throw err;
+      onDeleted?.();
+      onClose();
+    } catch(e) { setError(e.message); setDeleting(false); }
+  };
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.85)", zIndex:900,
+      backdropFilter:"blur(8px)", display:"flex", alignItems:"flex-end", justifyContent:"center" }}
+      onClick={e => { if (e.target===e.currentTarget) onClose(); }}>
+      <div style={{ background:"#14141A", width:"100%", maxWidth:430,
+        borderRadius:"20px 20px 0 0", maxHeight:"88vh", overflowY:"auto",
+        border:"1px solid #252530", animation:"slideUp .25s ease" }}>
+        <div style={{ padding:"16px 18px 12px", borderBottom:"1px solid #252530",
+          display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <span style={{ fontSize:16, fontWeight:800, color:"#F2EEE8" }}>Edit Spot</span>
+          <button onClick={onClose} style={{ color:"#6B6878", fontSize:20, background:"none", border:"none" }}>×</button>
+        </div>
+        <div style={{ padding:18, display:"flex", flexDirection:"column", gap:14 }}>
+          {/* Preview */}
+          {(spot.image_url || spot.image) && (
+            <img src={spot.image_url || spot.image} alt=""
+              style={{ width:"100%", height:160, objectFit:"cover", borderRadius:12 }} />
+          )}
+          {[
+            { key:"make",     label:"Make",     ph:spot.make     },
+            { key:"model",    label:"Model",    ph:spot.model    },
+            { key:"location", label:"Location", ph:spot.location },
+          ].map(({ key, label, ph }) => (
+            <div key={key}>
+              <label style={{ fontSize:11, color:"#6B6878", fontWeight:600,
+                textTransform:"uppercase", letterSpacing:".05em", display:"block", marginBottom:5 }}>
+                {label}
+              </label>
+              <input className="sd-input" value={form[key]} placeholder={ph}
+                onChange={e => setForm(p => ({ ...p, [key]:e.target.value }))} />
+            </div>
+          ))}
+          <div>
+            <label style={{ fontSize:11, color:"#6B6878", fontWeight:600,
+              textTransform:"uppercase", letterSpacing:".05em", display:"block", marginBottom:5 }}>
+              Rarity
+            </label>
+            <div style={{ display:"flex", gap:8 }}>
+              {["Sports","Exotic","Hypercar"].map(r => {
+                const rc = RARITY[r]; const active = form.rarity===r;
+                return (
+                  <button key={r} onClick={() => setForm(p=>({...p,rarity:r}))}
+                    style={{ flex:1, padding:"8px", borderRadius:9, fontSize:12, fontWeight:700,
+                      background:active?rc.bg:"#0A0A0C", border:`1px solid ${active?rc.border:"#252530"}`,
+                      color:active?rc.text:"#6B6878", cursor:"pointer" }}>{r}</button>
+                );
+              })}
+            </div>
+          </div>
+          <div>
+            <label style={{ fontSize:11, color:"#6B6878", fontWeight:600,
+              textTransform:"uppercase", letterSpacing:".05em", display:"block", marginBottom:5 }}>
+              Description
+            </label>
+            <textarea className="sd-input" rows={3} value={form.desc}
+              placeholder="Tell the story…"
+              onChange={e => setForm(p=>({...p,desc:e.target.value}))}
+              style={{ resize:"none", lineHeight:1.55 }} />
+          </div>
+          <ErrorMsg msg={error} />
+          {saved && <div style={{ color:"#22C55E", fontSize:13, textAlign:"center" }}>✓ Saved!</div>}
+
+          <button onClick={save} disabled={saving}
+            style={{ width:"100%", padding:13, borderRadius:12,
+              background:"linear-gradient(135deg,#E8430A,#BF360C)",
+              border:"none", color:"#fff", fontSize:15, fontWeight:700,
+              cursor:saving?"not-allowed":"pointer", display:"flex",
+              alignItems:"center", justifyContent:"center", gap:8 }}>
+            {saving ? <><Spinner size={16} color="#fff"/> Saving…</> : "Save Changes"}
+          </button>
+
+          {/* Delete */}
+          {!confirm ? (
+            <button onClick={() => setConfirm(true)}
+              style={{ width:"100%", padding:12, borderRadius:12,
+                background:"rgba(239,68,68,.1)", border:"1px solid rgba(239,68,68,.3)",
+                color:"#EF4444", fontSize:14, fontWeight:700, cursor:"pointer" }}>
+              🗑️ Delete Spot
+            </button>
+          ) : (
+            <div style={{ background:"rgba(239,68,68,.1)", border:"1px solid rgba(239,68,68,.3)",
+              borderRadius:12, padding:14 }}>
+              <div style={{ fontSize:13, color:"#EF4444", fontWeight:700,
+                marginBottom:10, textAlign:"center" }}>
+                Delete this spot permanently?
+              </div>
+              <div style={{ display:"flex", gap:8 }}>
+                <button onClick={() => setConfirm(false)}
+                  style={{ flex:1, padding:10, borderRadius:10, background:"#252530",
+                    border:"none", color:"#F2EEE8", fontSize:13, fontWeight:600, cursor:"pointer" }}>
+                  Cancel
+                </button>
+                <button onClick={del} disabled={deleting}
+                  style={{ flex:1, padding:10, borderRadius:10,
+                    background:"#EF4444", border:"none", color:"#fff",
+                    fontSize:13, fontWeight:700, cursor:"pointer",
+                    display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
+                  {deleting ? <Spinner size={12} color="#fff" /> : "Yes, Delete"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── ONBOARDING FLOW ──────────────────────────────────────────
+const ONBOARDING_KEY = "sd_onboarded_v1";
+
+function OnboardingFlow({ onDone }) {
+  const [slide, setSlide] = useState(0);
+
+  const SLIDES = [
+    {
+      emoji:"🏎",
+      title:"Welcome to SpotDrive",
+      sub:"The world's first social network built for car spotters.",
+      detail:"Capture rare cars in the wild. Share your sightings. Build your reputation.",
+      color:"#E8430A",
+      bg:"linear-gradient(135deg,#2D1200,#0A0A0C)",
+    },
+    {
+      emoji:"📸",
+      title:"Spot. Post. Get Clout.",
+      sub:"Every rare car you spot earns you points and followers.",
+      detail:"Hypercars score the highest. Sports cars are your gateway in. The leaderboard resets every Monday.",
+      color:"#b388ff",
+      bg:"linear-gradient(135deg,#12071A,#0A0A0C)",
+    },
+    {
+      emoji:"🏆",
+      title:"Climb the Leaderboard",
+      sub:"The top spotters get verified badges and featured in the feed.",
+      detail:"Compete by city, globally, or by rarity tier. Your streak rewards daily posting.",
+      color:"#C9A84C",
+      bg:"linear-gradient(135deg,#160F00,#0A0A0C)",
+    },
+  ];
+
+  const s = SLIDES[slide];
+
+  const finish = () => {
+    localStorage.setItem(ONBOARDING_KEY, "1");
+    onDone();
+  };
+
+  return (
+    <div style={{ position:"fixed", inset:0, zIndex:1000,
+      background:s.bg, display:"flex", flexDirection:"column",
+      alignItems:"center", justifyContent:"center", padding:32,
+      transition:"background .4s ease" }}>
+
+      {/* Progress dots */}
+      <div style={{ position:"absolute", top:48, display:"flex", gap:8 }}>
+        {SLIDES.map((_, i) => (
+          <div key={i} style={{ width: i===slide ? 24 : 8, height:8, borderRadius:99,
+            background: i===slide ? s.color : "#252530",
+            transition:"all .3s ease" }} />
+        ))}
+      </div>
+
+      {/* Content */}
+      <div style={{ textAlign:"center", maxWidth:320 }} key={slide} className="fade-up">
+        <div style={{ fontSize:80, marginBottom:24,
+          filter:`drop-shadow(0 0 30px ${s.color}60)` }}>{s.emoji}</div>
+        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:36,
+          fontWeight:900, color:"#F2EEE8", lineHeight:1.1, marginBottom:12 }}>
+          {s.title}
+        </div>
+        <div style={{ fontSize:16, color:s.color, fontWeight:600, marginBottom:12 }}>
+          {s.sub}
+        </div>
+        <div style={{ fontSize:14, color:"#6B6878", lineHeight:1.6 }}>
+          {s.detail}
+        </div>
+      </div>
+
+      {/* Buttons */}
+      <div style={{ position:"absolute", bottom:48, left:32, right:32 }}>
+        {slide < SLIDES.length - 1 ? (
+          <div style={{ display:"flex", gap:12 }}>
+            <button onClick={finish}
+              style={{ flex:1, padding:14, borderRadius:12, background:"none",
+                border:"1px solid #252530", color:"#6B6878", fontSize:14,
+                fontWeight:600, cursor:"pointer" }}>
+              Skip
+            </button>
+            <button onClick={() => setSlide(s => s + 1)}
+              style={{ flex:2, padding:14, borderRadius:12,
+                background:`linear-gradient(135deg,${s.color},${s.color}AA)`,
+                border:"none", color:"#fff", fontSize:15, fontWeight:700, cursor:"pointer" }}>
+              Next →
+            </button>
+          </div>
+        ) : (
+          <button onClick={finish}
+            style={{ width:"100%", padding:16, borderRadius:14,
+              background:`linear-gradient(135deg,${s.color},${s.color}AA)`,
+              border:"none", color:"#fff", fontSize:16, fontWeight:800, cursor:"pointer" }}>
+            Start Spotting 🏎
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── PUSH NOTIFICATIONS SETUP ─────────────────────────────────
+function usePushNotifications() {
+  const { user } = useAuth();
+  const [permission, setPermission] = useState(
+    typeof Notification !== "undefined" ? Notification.permission : "default"
+  );
+
+  const request = useCallback(async () => {
+    if (typeof Notification === "undefined") return;
+    const result = await Notification.requestPermission();
+    setPermission(result);
+    if (result === "granted" && user) {
+      // Save push token to Supabase (Web Push would use service worker in prod)
+      // For now we register the intent
+      await supabase.from("profiles")
+        .update({ push_enabled: true })
+        .eq("id", user.id)
+        .catch(() => {});
+    }
+    return result;
+  }, [user]);
+
+  const send = useCallback((title, body, icon = "🏎") => {
+    if (permission !== "granted") return;
+    try {
+      new Notification(title, { body, icon:"/favicon.ico", badge:"/favicon.ico",
+        tag:"spotdrive", renotify:true });
+    } catch(e) { console.log("Notification:", title, body); }
+  }, [permission]);
+
+  return { permission, request, send };
+}
+
+function PushNotificationBanner({ onDismiss }) {
+  const { request } = usePushNotifications();
+  const [requesting, setRequesting] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const handle = async () => {
+    setRequesting(true);
+    const result = await request();
+    setRequesting(false);
+    setDone(true);
+    setTimeout(onDismiss, 1500);
+  };
+
+  return (
+    <div style={{ margin:"10px 14px 0", padding:"12px 14px",
+      background:"linear-gradient(135deg,#2D1200,#14141A)",
+      border:"1px solid #E8430A30", borderRadius:12,
+      display:"flex", alignItems:"center", gap:12 }}>
+      <span style={{ fontSize:22, flexShrink:0 }}>🔔</span>
+      <div style={{ flex:1 }}>
+        <div style={{ fontSize:13, fontWeight:700, color:"#F2EEE8", marginBottom:2 }}>
+          {done ? "Notifications enabled! ✓" : "Enable notifications"}
+        </div>
+        <div style={{ fontSize:11, color:"#6B6878" }}>
+          {done ? "You'll be notified for likes, follows & comments."
+                : "Get alerted when someone likes or follows you."}
+        </div>
+      </div>
+      {!done && (
+        <div style={{ display:"flex", gap:6, flexShrink:0 }}>
+          <button onClick={onDismiss}
+            style={{ padding:"5px 10px", borderRadius:8, background:"none",
+              border:"1px solid #252530", color:"#6B6878", fontSize:11,
+              fontWeight:600, cursor:"pointer" }}>
+            Later
+          </button>
+          <button onClick={handle} disabled={requesting}
+            style={{ padding:"5px 12px", borderRadius:8,
+              background:"#E8430A", border:"none",
+              color:"#fff", fontSize:11, fontWeight:700, cursor:"pointer" }}>
+            {requesting ? "…" : "Enable"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AppContent() {
   const { user, loading } = useAuth();
+  const [onboarded, setOnboarded] = useState(() =>
+    typeof localStorage !== "undefined" && !!localStorage.getItem(ONBOARDING_KEY)
+  );
+
   if (loading) return (
     <div style={{ minHeight:"100vh", background:"#0A0A0C", display:"flex",
       alignItems:"center", justifyContent:"center", flexDirection:"column", gap:16 }}>
@@ -3117,7 +3889,10 @@ function AppContent() {
       <Spinner size={24} />
     </div>
   );
-  return user ? <MainApp /> : <AuthScreen />;
+
+  if (!user) return <AuthScreen />;
+  if (!onboarded) return <OnboardingFlow onDone={() => setOnboarded(true)} />;
+  return <MainApp />;
 }
 
 export default function App() {
