@@ -1991,26 +1991,274 @@ function MainApp() {
       )}
 
       {spotDetail && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.85)", zIndex:500,
-          backdropFilter:"blur(6px)", display:"flex", alignItems:"flex-end", justifyContent:"center" }}
-          onClick={e => { if (e.target===e.currentTarget) setSpotDetail(null); }}>
-          <div style={{ background:"#14141A", width:"100%", maxWidth:480, maxHeight:"90vh",
-            overflowY:"auto", borderRadius:"20px 20px 0 0", animation:"slideUp .25s ease", padding:20 }}>
-            <img src={spotDetail.image} alt="" style={{ width:"100%", height:200, objectFit:"cover", borderRadius:14, marginBottom:14 }} />
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
-              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:26, fontWeight:900, color:"#F2EEE8" }}>{spotDetail.make} {spotDetail.model}</div>
-              <RarityPill rarity={spotDetail.rarity} />
+        <CommentsSheet spot={spotDetail} onClose={() => setSpotDetail(null)} />
+      )}
+    </div>
+  );
+}
+
+// ─── COMMENTS SHEET ───────────────────────────────────────────
+function CommentsSheet({ spot, onClose }) {
+  const { user, profile } = useAuth();
+  const [comments,  setComments]  = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [text,      setText]      = useState("");
+  const [posting,   setPosting]   = useState(false);
+  const [liked,     setLiked]     = useState(spot.liked || false);
+  const [likes,     setLikes]     = useState(spot.likes || 0);
+  const [saved,     setSaved]     = useState(spot.saved || false);
+  const [imgErr,    setImgErr]    = useState(false);
+  const inputRef  = useRef(null);
+  const bottomRef = useRef(null);
+
+  const timeAgo = (ts) => {
+    const m = Math.floor((Date.now()-new Date(ts).getTime())/60000);
+    if (m<1) return "just now"; if (m<60) return `${m}m`;
+    if (m<1440) return `${Math.floor(m/60)}h`; return `${Math.floor(m/1440)}d`;
+  };
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase
+        .from("comments")
+        .select("*, profiles(handle, avatar_url)")
+        .eq("spot_id", spot.id)
+        .order("created_at", { ascending: true })
+        .limit(100);
+
+      if (data && data.length > 0) {
+        setComments(data.map(c => ({
+          ...c,
+          handle:     c.profiles?.handle || "spotter",
+          avatar_url: c.profiles?.avatar_url,
+          initials:   (c.profiles?.handle || "SP").slice(0,2).toUpperCase(),
+        })));
+      } else {
+        // Mock comments for demo spots
+        setComments([
+          { id:"c1", text:"Absolute beast in person 🔥", handle:"euro_spotter", initials:"LM", created_at: new Date(Date.now()-30*60000).toISOString(), likes_count:12 },
+          { id:"c2", text:"Verde Mantis is the best colour they make. No debate.", handle:"jdm_tokyo",    initials:"KT", created_at: new Date(Date.now()-20*60000).toISOString(), likes_count:8 },
+          { id:"c3", text:"Track spec too? That cage in the back is unmistakable", handle:"apex_hunter",  initials:"AH", created_at: new Date(Date.now()-10*60000).toISOString(), likes_count:5 },
+          { id:"c4", text:"Was this on Rodeo last Saturday? I think I saw this!", handle:"la_spotter",    initials:"MW", created_at: new Date(Date.now()-5*60000).toISOString(),  likes_count:3 },
+        ]);
+      }
+      setLoading(false);
+    };
+    load();
+  }, [spot.id]);
+
+  // Scroll to bottom when comments load
+  useEffect(() => {
+    if (!loading) setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:"smooth" }), 100);
+  }, [loading]);
+
+  const postComment = async () => {
+    if (!text.trim() || posting || !user) return;
+    setPosting(true);
+    const optimistic = {
+      id: `temp-${Date.now()}`,
+      text: text.trim(),
+      handle: profile?.handle || "you",
+      avatar_url: profile?.avatar_url,
+      initials: (profile?.handle || "YO").slice(0,2).toUpperCase(),
+      created_at: new Date().toISOString(),
+      likes_count: 0,
+      optimistic: true,
+    };
+    setComments(cs => [...cs, optimistic]);
+    setText("");
+    bottomRef.current?.scrollIntoView({ behavior:"smooth" });
+
+    try {
+      const { data, error } = await supabase.from("comments").insert({
+        spot_id:    spot.id,
+        user_id:    user.id,
+        text:       optimistic.text,
+      }).select("*, profiles(handle, avatar_url)").single();
+
+      if (error) throw error;
+
+      // Replace optimistic with real
+      setComments(cs => cs.map(c => c.id === optimistic.id ? {
+        ...data,
+        handle:     data.profiles?.handle || profile?.handle || "spotter",
+        avatar_url: data.profiles?.avatar_url || profile?.avatar_url,
+        initials:   (data.profiles?.handle || profile?.handle || "SP").slice(0,2).toUpperCase(),
+      } : c));
+
+      // Update comment count on spot
+      await supabase.from("spots")
+        .update({ comments_count: (spot.comments || 0) + 1 })
+        .eq("id", spot.id);
+
+    } catch(err) {
+      // Remove optimistic on failure
+      setComments(cs => cs.filter(c => c.id !== optimistic.id));
+      setText(optimistic.text);
+      console.error(err);
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  const handleLike = () => {
+    const next = !liked;
+    setLiked(next); setLikes(n => next ? n+1 : n-1);
+  };
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.88)", zIndex:500,
+      backdropFilter:"blur(8px)", display:"flex", alignItems:"flex-end", justifyContent:"center" }}
+      onClick={e => { if (e.target===e.currentTarget) onClose(); }}>
+      <div style={{ background:"#0A0A0C", width:"100%", maxWidth:480,
+        height:"92vh", borderRadius:"20px 20px 0 0", border:"1px solid #252530",
+        display:"flex", flexDirection:"column", animation:"slideUp .25s ease" }}>
+
+        {/* Drag handle */}
+        <div style={{ padding:"12px 16px 0", flexShrink:0 }}>
+          <div style={{ width:36, height:4, borderRadius:2, background:"#252530", margin:"0 auto 12px" }} />
+        </div>
+
+        {/* Scrollable content */}
+        <div style={{ flex:1, overflowY:"auto" }}>
+
+          {/* Spot summary */}
+          <div style={{ padding:"0 16px 14px", borderBottom:"1px solid #252530" }}>
+            <div style={{ display:"flex", gap:12, alignItems:"center" }}>
+              <div style={{ width:64, height:64, borderRadius:10, overflow:"hidden", flexShrink:0 }}>
+                {spot.image && !imgErr
+                  ? <img src={spot.image} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}
+                      onError={() => setImgErr(true)} />
+                  : <div style={{ width:"100%", height:"100%", background:"#2D1200",
+                      display:"flex", alignItems:"center", justifyContent:"center", fontSize:24 }}>🏎</div>
+                }
+              </div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:20,
+                  fontWeight:900, color:"#F2EEE8", lineHeight:1, marginBottom:4 }}>
+                  {spot.make} {spot.model}
+                </div>
+                <div style={{ display:"flex", gap:6, alignItems:"center", marginBottom:4 }}>
+                  <RarityPill rarity={spot.rarity} />
+                  <span style={{ fontSize:11, color:"#6B6878" }}>{spot.year}</span>
+                </div>
+                <div style={{ fontSize:11, color:"#6B6878" }}>📍 {spot.location}</div>
+              </div>
             </div>
-            <div style={{ fontSize:12, color:"#6B6878", marginBottom:12 }}>📍 {spotDetail.location} · {spotDetail.time}</div>
-            <p style={{ fontSize:13, color:"#AAA6A0", lineHeight:1.65, marginBottom:16 }}>{spotDetail.description}</p>
-            <button onClick={() => setSpotDetail(null)}
-              style={{ width:"100%", padding:12, borderRadius:12, border:"1px solid #252530",
-                background:"none", color:"#6B6878", fontSize:14, fontWeight:600, cursor:"pointer" }}>
-              Close
-            </button>
+
+            {/* Action bar */}
+            <div style={{ display:"flex", gap:16, marginTop:12, paddingTop:12,
+              borderTop:"1px solid #252530" }}>
+              <button onClick={handleLike}
+                style={{ display:"flex", alignItems:"center", gap:5, color:liked?"#E8430A":"#6B6878",
+                  fontSize:13, fontWeight:600, border:"none", background:"none", cursor:"pointer" }}>
+                {liked?"❤️":"🤍"} {fmt(likes)}
+              </button>
+              <button onClick={() => inputRef.current?.focus()}
+                style={{ display:"flex", alignItems:"center", gap:5, color:"#E8430A",
+                  fontSize:13, fontWeight:600, border:"none", background:"none", cursor:"pointer" }}>
+                💬 {comments.length}
+              </button>
+              <button onClick={() => setSaved(s => !s)}
+                style={{ display:"flex", alignItems:"center", gap:5,
+                  color:saved?"#C9A84C":"#6B6878",
+                  fontSize:13, fontWeight:600, border:"none", background:"none", cursor:"pointer" }}>
+                {saved?"🔖":"📎"} {fmt(spot.saves)}
+              </button>
+              <button style={{ marginLeft:"auto", color:"#6B6878", border:"none", background:"none", fontSize:14 }}>
+                ↗
+              </button>
+            </div>
+
+            {/* Description */}
+            {spot.description && (
+              <p style={{ fontSize:13, color:"#AAA6A0", lineHeight:1.6, marginTop:10 }}>
+                <span style={{ color:"#F2EEE8", fontWeight:700 }}>@{spot.user?.handle} </span>
+                {spot.description}
+              </p>
+            )}
+          </div>
+
+          {/* Comments header */}
+          <div style={{ padding:"12px 16px 6px" }}>
+            <div style={{ fontSize:12, fontWeight:700, color:"#6B6878",
+              textTransform:"uppercase", letterSpacing:".06em" }}>
+              {loading ? "Loading…" : `${comments.length} comment${comments.length!==1?"s":""}`}
+            </div>
+          </div>
+
+          {/* Comments list */}
+          {loading ? (
+            Array(3).fill(0).map((_,i) => (
+              <div key={i} style={{ display:"flex", gap:10, padding:"10px 16px" }}>
+                <div className="shimmer" style={{ width:34, height:34, borderRadius:"50%", flexShrink:0 }} />
+                <div style={{ flex:1, display:"flex", flexDirection:"column", gap:5 }}>
+                  <div className="shimmer" style={{ height:11, width:"30%" }} />
+                  <div className="shimmer" style={{ height:13, width:"75%" }} />
+                </div>
+              </div>
+            ))
+          ) : comments.length === 0 ? (
+            <div style={{ textAlign:"center", padding:"32px 20px" }}>
+              <div style={{ fontSize:32, marginBottom:8 }}>💬</div>
+              <div style={{ fontSize:14, fontWeight:700, color:"#F2EEE8", marginBottom:4 }}>No comments yet</div>
+              <div style={{ fontSize:12, color:"#6B6878" }}>Be the first to comment on this spot.</div>
+            </div>
+          ) : (
+            comments.map(c => (
+              <div key={c.id} style={{ display:"flex", gap:10, padding:"10px 16px",
+                opacity: c.optimistic ? 0.6 : 1, transition:"opacity .3s" }}>
+                <Avatar initials={c.initials} src={c.avatar_url} size={34} />
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ display:"flex", alignItems:"baseline", gap:6, marginBottom:3 }}>
+                    <span style={{ fontSize:13, fontWeight:700, color:"#F2EEE8" }}>@{c.handle}</span>
+                    <span style={{ fontSize:10, color:"#6B6878" }}>{timeAgo(c.created_at)}</span>
+                    {c.optimistic && <span style={{ fontSize:10, color:"#6B6878" }}>sending…</span>}
+                  </div>
+                  <div style={{ fontSize:13, color:"#AAA6A0", lineHeight:1.5 }}>{c.text}</div>
+                  {c.likes_count > 0 && (
+                    <div style={{ fontSize:11, color:"#6B6878", marginTop:4 }}>
+                      ❤️ {c.likes_count}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+          <div ref={bottomRef} style={{ height:8 }} />
+        </div>
+
+        {/* Comment input */}
+        <div style={{ flexShrink:0, padding:"10px 14px",
+          borderTop:"1px solid #252530", background:"#0A0A0C",
+          paddingBottom:"max(10px,env(safe-area-inset-bottom))" }}>
+          <div style={{ display:"flex", gap:10, alignItems:"flex-end" }}>
+            <Avatar initials={profile?.handle?.slice(0,2).toUpperCase()||"ME"}
+              src={profile?.avatar_url} size={34} />
+            <div style={{ flex:1, background:"#14141A", border:"1.5px solid #252530",
+              borderRadius:22, padding:"8px 14px", display:"flex", alignItems:"center", gap:8,
+              transition:"border-color .15s",
+              ...(text ? { borderColor:"#E8430A", boxShadow:"0 0 0 3px #2D1200" } : {}) }}>
+              <input
+                ref={inputRef}
+                value={text}
+                onChange={e => setText(e.target.value)}
+                onKeyDown={e => { if (e.key==="Enter" && !e.shiftKey) { e.preventDefault(); postComment(); } }}
+                placeholder="Add a comment…"
+                style={{ flex:1, background:"none", border:"none", color:"#F2EEE8",
+                  fontSize:14, outline:"none", minWidth:0 }} />
+              {text.trim() && (
+                <button onClick={postComment} disabled={posting}
+                  style={{ background:"none", border:"none", color:"#E8430A",
+                    fontWeight:700, fontSize:13, cursor:"pointer", flexShrink:0,
+                    display:"flex", alignItems:"center", gap:4 }}>
+                  {posting ? <Spinner size={14} color="#E8430A" /> : "Post"}
+                </button>
+              )}
+            </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
