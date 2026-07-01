@@ -2756,14 +2756,16 @@ function MapScreen() {
       const L = window.L;
 
       const map = L.map(mapRef.current, {
-        center: [25, 20],
-        zoom: 3,
+        center: [30, 20],
+        zoom: 2,
         zoomControl: false,
         attributionControl: false,
+        minZoom: 2,
+        maxZoom: 18,
       });
 
       // Force Leaflet to recalculate size after DOM settles
-      setTimeout(() => map.invalidateSize(), 100);
+      setTimeout(() => { map.invalidateSize(); map.setView([30, 20], 2); }, 300);
 
       // Dark tile layer (CartoDB dark matter)
       L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png", {
@@ -2842,7 +2844,7 @@ function MapScreen() {
       markersRef.current.push(marker);
     });
 
-  }, [mapReady, filter, filteredSpots.length]);
+  }, [mapReady, filter]);
 
   // CSS for pulse animation
   useEffect(() => {
@@ -2871,8 +2873,8 @@ function MapScreen() {
   }, []);
 
   return (
-    <div style={{ position:"relative", height:"calc(100vh - 110px)",
-      display:"flex", flexDirection:"column", overflow:"hidden" }}>
+    <div style={{ position:"relative", overflow:"hidden",
+      height:"calc(100vh - 114px)" }}>
 
       {/* Filter pills — float over map */}
       <div style={{ position:"absolute", top:12, left:12, zIndex:1000,
@@ -2908,8 +2910,7 @@ function MapScreen() {
       </div>
 
       {/* Leaflet map — must have explicit height */}
-      <div ref={mapRef} style={{ flex:1, width:"100%", minHeight:0,
-        height:"calc(100vh - 110px)" }} />
+      <div ref={mapRef} style={{ width:"100%", height:"100%" }} />
 
       {/* Loading overlay */}
       {!mapReady && (
