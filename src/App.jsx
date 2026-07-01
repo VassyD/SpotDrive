@@ -1153,45 +1153,397 @@ function FeedScreen({ onSpotTap }) {
   );
 }
 
+// ─── FOLLOW BUTTON ────────────────────────────────────────────
+function FollowButton({ targetUserId, targetHandle, size="md" }) {
+  const { user } = useAuth();
+  const [following,  setFollowing]  = useState(null); // null = loading
+  const [processing, setProcessing] = useState(false);
+
+  useEffect(() => {
+    if (!user || !targetUserId || user.id === targetUserId) return;
+    supabase.from("follows")
+      .select("id").eq("follower_id", user.id).eq("following_id", targetUserId).single()
+      .then(({ data }) => setFollowing(!!data));
+  }, [user, targetUserId]);
+
+  const toggle = async (e) => {
+    e.stopPropagation();
+    if (!user || processing || user.id === targetUserId) return;
+    setProcessing(true);
+    try {
+      if (following) {
+        await supabase.from("follows")
+          .delete().eq("follower_id", user.id).eq("following_id", targetUserId);
+        // Decrement counts
+        await supabase.rpc("decrement_follow_counts", {
+          follower: user.id, following: targetUserId
+        }).catch(() => {
+          // Fallback: manual update if RPC not set up
+          supabase.from("profiles").select("followers_count").eq("id", targetUserId).single()
+            .then(({ data }) => {
+              if (data) supabase.from("profiles")
+                .update({ followers_count: Math.max(0, (data.followers_count||1)-1) })
+                .eq("id", targetUserId);
+            });
+        });
+        setFollowing(false);
+      } else {
+        await supabase.from("follows")
+          .insert({ follower_id: user.id, following_id: targetUserId });
+        // Increment counts
+        await supabase.from("profiles").select("followers_count").eq("id", targetUserId).single()
+          .then(({ data }) => {
+            if (data) supabase.from("profiles")
+              .update({ followers_count: (data.followers_count||0)+1 })
+              .eq("id", targetUserId);
+          });
+        setFollowing(true);
+      }
+    } catch(err) { console.error(err); }
+    finally { setProcessing(false); }
+  };
+
+  // Don't show button for own profile
+  if (!user || user.id === targetUserId) return null;
+  // Still loading follow state
+  if (following === null) return (
+    <div style={{ width: size==="sm"?70:90, height:size==="sm"?28:34, borderRadius:99,
+      background:"#252530", animation:"shimmer 1.4s ease-in-out infinite" }} />
+  );
+
+  const sm = size === "sm";
+  return (
+    <button onClick={toggle} disabled={processing}
+      aria-label={following ? `Unfollow @${targetHandle}` : `Follow @${targetHandle}`}
+      style={{ padding: sm?"5px 14px":"8px 20px",
+        borderRadius:99, fontSize: sm?11:13, fontWeight:700,
+        background: following ? "none" : "#E8430A",
+        border: following ? "1px solid #252530" : "1px solid #E8430A",
+        color: following ? "#6B6878" : "#fff",
+        cursor: processing ? "not-allowed" : "pointer",
+        opacity: processing ? 0.7 : 1,
+        transition:"all .15s", display:"flex", alignItems:"center", gap:4 }}>
+      {processing ? <Spinner size={10} color={following?"#6B6878":"#fff"} /> : null}
+      {following ? "Following" : "Follow"}
+    </button>
+  );
+}
+
+// ─── SPOTTER PROFILE SHEET ────────────────────────────────────
+function SpotterProfileSheet({ handle, onClose }) {
+  const { user } = useAuth();
+  const [spotter,  setSpotter]  = useState(null);
+  const [spots,    setSpots]    = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [tab,      setTab]      = useState("spots");
+
+  useEffect(() => {
+    if (!handle) return;
+    const load = async () => {
+      const { data: profileData } = await supabase
+        .from("profiles").select("*").eq("handle", handle).single();
+      setSpotter(profileData);
+
+      if (profileData) {
+        const { data: spotData } = await supabase
+          .from("spots").select("*")
+          .eq("user_id", profileData.id).eq("status","live")
+          .order("created_at",{ ascending:false }).limit(12);
+        setSpots(spotData || []);
+      }
+      setLoading(false);
+    };
+    load();
+  }, [handle]);
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.85)", zIndex:800,
+      backdropFilter:"blur(6px)", display:"flex", alignItems:"flex-end", justifyContent:"center" }}
+      onClick={e => { if (e.target===e.currentTarget) onClose(); }}>
+      <div style={{ background:"#0A0A0C", width:"100%", maxWidth:430,
+        height:"90vh", borderRadius:"20px 20px 0 0", border:"1px solid #252530",
+        display:"flex", flexDirection:"column", animation:"slideUp .25s ease" }}>
+
+        {/* Header */}
+        <div style={{ padding:"14px 16px 0", flexShrink:0 }}>
+          <div style={{ width:36, height:4, borderRadius:2, background:"#252530", margin:"0 auto 14px" }} />
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
+            <button onClick={onClose}
+              style={{ width:32, height:32, borderRadius:"50%", background:"#18181F",
+                border:"1px solid #252530", display:"flex", alignItems:"center",
+                justifyContent:"center", color:"#6B6878", fontSize:18, cursor:"pointer" }}>
+              ‹
+            </button>
+            <span style={{ fontSize:15, fontWeight:700, color:"#F2EEE8" }}>@{handle}</span>
+          </div>
+        </div>
+
+        <div style={{ flex:1, overflowY:"auto" }}>
+          {loading ? (
+            <div style={{ display:"flex", justifyContent:"center", padding:40 }}>
+              <Spinner size={28} />
+            </div>
+          ) : !spotter ? (
+            <div style={{ textAlign:"center", padding:"60px 20px" }}>
+              <div style={{ fontSize:36, marginBottom:10 }}>👤</div>
+              <div style={{ fontSize:15, color:"#6B6878" }}>Spotter not found</div>
+            </div>
+          ) : (
+            <div>
+              {/* Profile header */}
+              <div style={{ background:"linear-gradient(180deg,#2D1200 0%,#0A0A0C 100%)", padding:"0 16px 0" }}>
+                <div style={{ display:"flex", gap:14, alignItems:"flex-end", marginBottom:16 }}>
+                  <Avatar initials={spotter.handle?.slice(0,2).toUpperCase()||"?"} src={spotter.avatar_url} size={64} ring />
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:20, fontWeight:900, color:"#F2EEE8" }}>
+                      {spotter.display_name || spotter.handle}
+                    </div>
+                    <div style={{ fontSize:12, color:"#6B6878", marginBottom:8 }}>@{spotter.handle}</div>
+                    {spotter.bio && <div style={{ fontSize:12, color:"#AAA6A0", lineHeight:1.4, marginBottom:8 }}>{spotter.bio}</div>}
+                    <FollowButton targetUserId={spotter.id} targetHandle={spotter.handle} />
+                  </div>
+                </div>
+
+                {/* Stats */}
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)",
+                  borderTop:"1px solid #252530", paddingTop:12, marginBottom:0 }}>
+                  {[
+                    ["Spots",     spots.length],
+                    ["Followers", spotter.followers_count||0],
+                    ["Following", spotter.following_count||0],
+                  ].map(([label, value]) => (
+                    <div key={label} style={{ textAlign:"center" }}>
+                      <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:20, fontWeight:900, color:"#F2EEE8" }}>{value}</div>
+                      <div style={{ fontSize:10, color:"#6B6878", textTransform:"uppercase", letterSpacing:".05em" }}>{label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Tabs */}
+                <div style={{ display:"flex", marginTop:14, borderTop:"1px solid #252530" }}>
+                  {["spots","about"].map(t => (
+                    <button key={t} onClick={() => setTab(t)}
+                      style={{ flex:1, padding:"10px", fontSize:12, fontWeight:600,
+                        background:"none", border:"none", cursor:"pointer", textTransform:"capitalize",
+                        color: tab===t ? "#E8430A" : "#6B6878",
+                        borderBottom: tab===t ? "2px solid #E8430A" : "2px solid transparent" }}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Spots grid */}
+              {tab === "spots" && (
+                spots.length === 0 ? (
+                  <div style={{ textAlign:"center", padding:"48px 20px" }}>
+                    <div style={{ fontSize:32, marginBottom:8 }}>📸</div>
+                    <div style={{ fontSize:14, color:"#6B6878" }}>No spots yet</div>
+                  </div>
+                ) : (
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:2, padding:2 }}>
+                    {spots.map(s => (
+                      <div key={s.id} style={{ aspectRatio:"1", overflow:"hidden", position:"relative" }}>
+                        {s.image_url
+                          ? <img src={s.image_url} alt="" loading="lazy"
+                              style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                          : <div style={{ width:"100%", height:"100%", background:"#2D1200",
+                              display:"flex", alignItems:"center", justifyContent:"center", fontSize:24 }}>🏎</div>
+                        }
+                        <div style={{ position:"absolute", inset:0, background:"linear-gradient(to bottom,transparent 60%,rgba(0,0,0,.7))" }} />
+                        <div style={{ position:"absolute", bottom:4, left:4,
+                          fontFamily:"'Barlow Condensed',sans-serif", fontSize:10, fontWeight:800, color:"#fff" }}>
+                          {s.make}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+
+              {/* About tab */}
+              {tab === "about" && (
+                <div style={{ padding:"16px 16px 40px" }}>
+                  <div style={{ background:"#14141A", borderRadius:12, padding:16, border:"1px solid #252530" }}>
+                    {[
+                      { icon:"🏎", label:"Spots posted",   value: spots.length },
+                      { icon:"👥", label:"Followers",       value: spotter.followers_count||0 },
+                      { icon:"👤", label:"Following",       value: spotter.following_count||0 },
+                      { icon:"📅", label:"Member since",    value: new Date(spotter.created_at).toLocaleDateString("en-GB",{month:"short",year:"numeric"}) },
+                    ].map(({ icon, label, value }) => (
+                      <div key={label} style={{ display:"flex", alignItems:"center", gap:12,
+                        padding:"10px 0", borderBottom:"1px solid #252530" }}>
+                        <span style={{ fontSize:18, width:24, textAlign:"center" }}>{icon}</span>
+                        <span style={{ fontSize:13, color:"#6B6878", flex:1 }}>{label}</span>
+                        <span style={{ fontSize:13, fontWeight:700, color:"#F2EEE8" }}>{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ExploreScreen({ onSpotTap }) {
-  const [query,  setQuery]  = useState("");
-  const [filter, setFilter] = useState("All");
-  const filtered = MOCK_SPOTS.filter(s => {
+  const { user } = useAuth();
+  const [tab,      setTab]      = useState("spots");  // spots | spotters
+  const [query,    setQuery]    = useState("");
+  const [filter,   setFilter]   = useState("All");
+  const [spotters, setSpotters] = useState([]);
+  const [loadingSpotters, setLoadingSpotters] = useState(false);
+  const [viewProfile, setViewProfile] = useState(null);
+
+  // Load spotters from Supabase
+  useEffect(() => {
+    if (tab !== "spotters") return;
+    setLoadingSpotters(true);
+    supabase.from("profiles").select("*")
+      .order("followers_count", { ascending:false }).limit(20)
+      .then(({ data }) => {
+        if (data && data.length > 0) setSpotters(data);
+        else setSpotters([
+          { id:"mock1", handle:"apex_hunter",     display_name:"Tyler Rhodes",   followers_count:18400, spots_count:412, is_verified:true,  initials:"TR" },
+          { id:"mock2", handle:"euro_spotter",     display_name:"Lena Müller",    followers_count:54200, spots_count:889, is_verified:false, initials:"LM" },
+          { id:"mock3", handle:"jdm_tokyo",        display_name:"Kenji Tanaka",   followers_count:91000, spots_count:1204,is_verified:true,  initials:"KT" },
+          { id:"mock4", handle:"la_spotter",       display_name:"Marcus Webb",    followers_count:12100, spots_count:203, is_verified:false, initials:"MW" },
+          { id:"mock5", handle:"gulf_spots",       display_name:"Omar Al-Rashid", followers_count:38700, spots_count:567, is_verified:true,  initials:"OR" },
+          { id:"mock6", handle:"nring_nut",        display_name:"Hans Fischer",   followers_count:8300,  spots_count:145, is_verified:false, initials:"HF" },
+        ]);
+        setLoadingSpotters(false);
+      });
+  }, [tab]);
+
+  const filteredSpots = MOCK_SPOTS.filter(s => {
     const mq = !query || `${s.make} ${s.model} ${s.location}`.toLowerCase().includes(query.toLowerCase());
     return mq && (filter==="All" || s.rarity===filter);
   });
+
+  const filteredSpotters = spotters.filter(s =>
+    !query || s.handle?.toLowerCase().includes(query.toLowerCase()) ||
+              s.display_name?.toLowerCase().includes(query.toLowerCase())
+  );
+
   return (
     <div style={{ padding:14 }}>
+      {/* Search bar */}
       <div style={{ position:"relative", marginBottom:12 }}>
         <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", color:"#6B6878", fontSize:14 }}>🔍</span>
-        <input className="sd-input" placeholder="Search make, model, location…" value={query} onChange={e=>setQuery(e.target.value)} style={{ paddingLeft:36 }} />
+        <input className="sd-input" value={query} onChange={e=>setQuery(e.target.value)}
+          placeholder={tab==="spotters" ? "Search spotters by name or handle…" : "Search make, model, location…"}
+          style={{ paddingLeft:36 }} />
       </div>
-      <div style={{ display:"flex", gap:6, marginBottom:14, overflowX:"auto" }}>
-        {["All","Hypercar","Exotic","Sports"].map(f => (
-          <button key={f} onClick={()=>setFilter(f)}
-            style={{ padding:"6px 14px", borderRadius:20, fontSize:12, fontWeight:600,
-              background:filter===f?"#2D1200":"#18181F", border:`1px solid ${filter===f?"#E8430A":"#252530"}`,
-              color:filter===f?"#E8430A":"#6B6878", whiteSpace:"nowrap", cursor:"pointer" }}>{f}</button>
+
+      {/* Tab selector */}
+      <div style={{ display:"flex", gap:8, marginBottom:14 }}>
+        {[["spots","🏎 Spots"],["spotters","👥 Spotters"]].map(([key,label]) => (
+          <button key={key} onClick={()=>{ setTab(key); setQuery(""); }}
+            style={{ flex:1, padding:"9px", borderRadius:10, fontSize:13, fontWeight:700,
+              background: tab===key ? "#2D1200" : "#18181F",
+              border:`1px solid ${tab===key?"#E8430A":"#252530"}`,
+              color: tab===key?"#E8430A":"#6B6878", cursor:"pointer" }}>
+            {label}
+          </button>
         ))}
       </div>
-      {filtered.length===0
-        ? <div style={{ textAlign:"center", padding:"60px 0" }}>
-            <div style={{ fontSize:40, marginBottom:12 }}>🔍</div>
-            <div style={{ fontSize:16, fontWeight:700, color:"#F2EEE8" }}>No spots found</div>
+
+      {/* SPOTS tab */}
+      {tab === "spots" && (
+        <>
+          <div style={{ display:"flex", gap:6, marginBottom:14, overflowX:"auto" }}>
+            {["All","Hypercar","Exotic","Sports"].map(f => (
+              <button key={f} onClick={()=>setFilter(f)}
+                style={{ padding:"6px 14px", borderRadius:20, fontSize:12, fontWeight:600,
+                  background:filter===f?"#2D1200":"#18181F", border:`1px solid ${filter===f?"#E8430A":"#252530"}`,
+                  color:filter===f?"#E8430A":"#6B6878", whiteSpace:"nowrap", cursor:"pointer" }}>{f}</button>
+            ))}
           </div>
-        : <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-            {filtered.map(s => (
-              <div key={s.id} onClick={()=>onSpotTap(s)} style={{ borderRadius:12, overflow:"hidden", position:"relative", aspectRatio:"1", cursor:"pointer" }}>
-                <img src={s.image} alt="" loading="lazy" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
-                <div style={{ position:"absolute", inset:0, background:"linear-gradient(to bottom, transparent 40%, rgba(0,0,0,.75))" }} />
-                <div style={{ position:"absolute", top:6, left:6 }}><RarityPill rarity={s.rarity} /></div>
-                <div style={{ position:"absolute", bottom:8, left:8, right:8 }}>
-                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:14, fontWeight:800, color:"#fff", lineHeight:1.1 }}>{s.make} {s.model}</div>
+          {filteredSpots.length===0
+            ? <div style={{ textAlign:"center", padding:"60px 0" }}>
+                <div style={{ fontSize:40, marginBottom:12 }}>🔍</div>
+                <div style={{ fontSize:16, fontWeight:700, color:"#F2EEE8" }}>No spots found</div>
+              </div>
+            : <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                {filteredSpots.map(s => (
+                  <div key={s.id} onClick={()=>onSpotTap(s)} style={{ borderRadius:12, overflow:"hidden", position:"relative", aspectRatio:"1", cursor:"pointer" }}>
+                    <img src={s.image} alt="" loading="lazy" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                    <div style={{ position:"absolute", inset:0, background:"linear-gradient(to bottom, transparent 40%, rgba(0,0,0,.75))" }} />
+                    <div style={{ position:"absolute", top:6, left:6 }}><RarityPill rarity={s.rarity} /></div>
+                    <div style={{ position:"absolute", bottom:8, left:8, right:8 }}>
+                      <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:14, fontWeight:800, color:"#fff", lineHeight:1.1 }}>{s.make} {s.model}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+          }
+        </>
+      )}
+
+      {/* SPOTTERS tab */}
+      {tab === "spotters" && (
+        loadingSpotters ? (
+          Array(4).fill(0).map((_,i) => (
+            <div key={i} style={{ display:"flex", gap:12, padding:"12px 0", borderBottom:"1px solid #252530", alignItems:"center" }}>
+              <div className="shimmer" style={{ width:48, height:48, borderRadius:"50%", flexShrink:0 }} />
+              <div style={{ flex:1, display:"flex", flexDirection:"column", gap:6 }}>
+                <div className="shimmer" style={{ height:13, width:"50%" }} />
+                <div className="shimmer" style={{ height:11, width:"30%" }} />
+              </div>
+            </div>
+          ))
+        ) : filteredSpotters.length === 0 ? (
+          <div style={{ textAlign:"center", padding:"60px 0" }}>
+            <div style={{ fontSize:40, marginBottom:12 }}>👥</div>
+            <div style={{ fontSize:15, color:"#6B6878" }}>No spotters found</div>
+          </div>
+        ) : (
+          <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
+            {filteredSpotters.map((spotter, i) => (
+              <div key={spotter.id}
+                style={{ display:"flex", alignItems:"center", gap:12, padding:"13px 0",
+                  borderBottom:"1px solid #252530", cursor:"pointer" }}
+                onClick={() => setViewProfile(spotter.handle)}>
+                {/* Rank */}
+                <div style={{ width:20, textAlign:"center", flexShrink:0,
+                  fontFamily:"'Barlow Condensed',sans-serif", fontSize:14,
+                  fontWeight:900, color: i===0?"#C9A84C":i===1?"#AAA6A0":i===2?"#CD7F32":"#3D3D4E" }}>
+                  {i+1}
                 </div>
+                <Avatar initials={spotter.initials || spotter.handle?.slice(0,2).toUpperCase() || "SP"}
+                  src={spotter.avatar_url} size={48} />
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                    <span style={{ fontSize:14, fontWeight:700, color:"#F2EEE8",
+                      overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                      {spotter.display_name || spotter.handle}
+                    </span>
+                    {spotter.is_verified && <span style={{ fontSize:13 }}>✅</span>}
+                  </div>
+                  <div style={{ fontSize:12, color:"#6B6878" }}>@{spotter.handle}</div>
+                  <div style={{ display:"flex", gap:10, marginTop:3 }}>
+                    <span style={{ fontSize:11, color:"#6B6878" }}>
+                      <span style={{ color:"#F2EEE8", fontWeight:700 }}>{fmt(spotter.followers_count||0)}</span> followers
+                    </span>
+                    <span style={{ fontSize:11, color:"#6B6878" }}>
+                      <span style={{ color:"#F2EEE8", fontWeight:700 }}>{spotter.spots_count||0}</span> spots
+                    </span>
+                  </div>
+                </div>
+                <FollowButton targetUserId={spotter.id} targetHandle={spotter.handle} size="sm" />
               </div>
             ))}
           </div>
-      }
+        )
+      )}
+
+      {/* Spotter profile sheet */}
+      {viewProfile && (
+        <SpotterProfileSheet handle={viewProfile} onClose={() => setViewProfile(null)} />
+      )}
     </div>
   );
 }
