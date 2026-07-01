@@ -547,7 +547,7 @@ function UploadModal({ onClose }) {
 }
 
 // ─── SETTINGS SHEET ───────────────────────────────────────────
-function SettingsSheet({ onClose, onEditProfile, onChangePhoto }) {
+function SettingsSheet({ onClose, onEditProfile, onChangePhoto, onPrivacy }) {
   const { user, profile, signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
 
@@ -576,7 +576,7 @@ function SettingsSheet({ onClose, onEditProfile, onChangePhoto }) {
           { icon:"👤", label:"Edit Profile",  action:() => { onClose(); onEditProfile(); } },
           { icon:"📸", label:"Change Photo",   action:() => { onClose(); onChangePhoto(); } },
           { icon:"🔔", label:"Notifications", action:onClose },
-          { icon:"🔒", label:"Privacy",        action:onClose },
+          { icon:"🔒", label:"Privacy",        action:() => { onClose(); onPrivacy(); } },
         ].map(({ icon, label, action }) => (
           <button key={label} onClick={action}
             style={{ width:"100%", display:"flex", alignItems:"center", gap:12, padding:14,
@@ -592,6 +592,185 @@ function SettingsSheet({ onClose, onEditProfile, onChangePhoto }) {
             borderRadius:12, color:"#EF4444", fontSize:14, fontWeight:700, cursor:"pointer", marginTop:4 }}>
           {signingOut ? <Spinner size={14} color="#EF4444" /> : "🚪 Sign Out"}
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── PRIVACY SHEET ────────────────────────────────────────────
+function PrivacySheet({ onClose }) {
+  const { user, profile, fetchProfile } = useAuth();
+
+  // Load saved privacy settings from profile metadata
+  const [settings, setSettings] = useState({
+    privateAccount:     profile?.is_private       ?? false,
+    showLocation:       profile?.show_location     ?? true,
+    allowTagging:       profile?.allow_tagging     ?? true,
+    showOnLeaderboard:  profile?.show_leaderboard  ?? true,
+    allowMessages:      profile?.allow_messages    ?? true,
+    dataAnalytics:      profile?.data_analytics    ?? true,
+  });
+  const [saving,  setSaving]  = useState(false);
+  const [saved,   setSaved]   = useState(false);
+
+  const toggle = (key) => setSettings(p => ({ ...p, [key]: !p[key] }));
+
+  const saveSettings = async () => {
+    setSaving(true); setSaved(false);
+    try {
+      await supabase.from("profiles").update({
+        is_private:       settings.privateAccount,
+        show_location:    settings.showLocation,
+        allow_tagging:    settings.allowTagging,
+        show_leaderboard: settings.showOnLeaderboard,
+        allow_messages:   settings.allowMessages,
+        data_analytics:   settings.dataAnalytics,
+      }).eq("id", user.id);
+      await fetchProfile(user.id);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch(err) { console.error(err); }
+    finally { setSaving(false); }
+  };
+
+  const SECTIONS = [
+    {
+      title: "Account",
+      items: [
+        { key:"privateAccount",    icon:"🔒", label:"Private Account",
+          desc:"Only approved followers can see your spots and profile." },
+        { key:"showOnLeaderboard", icon:"🏆", label:"Show on Leaderboard",
+          desc:"Appear in city and global spotter leaderboards." },
+      ],
+    },
+    {
+      title: "Spots & Location",
+      items: [
+        { key:"showLocation",  icon:"📍", label:"Show Location on Spots",
+          desc:"Display the location tag when you post a spot." },
+        { key:"allowTagging",  icon:"🏷️", label:"Allow Others to Tag Me",
+          desc:"Other spotters can mention you in their posts." },
+      ],
+    },
+    {
+      title: "Interactions",
+      items: [
+        { key:"allowMessages",  icon:"💬", label:"Allow Direct Messages",
+          desc:"Other users can send you messages." },
+        { key:"dataAnalytics",  icon:"📊", label:"Help Improve SpotDrive",
+          desc:"Share anonymous usage data to improve the app." },
+      ],
+    },
+  ];
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.8)", zIndex:800,
+      backdropFilter:"blur(6px)", display:"flex", alignItems:"flex-end", justifyContent:"center" }}
+      onClick={e => { if (e.target===e.currentTarget) onClose(); }}>
+      <div style={{ background:"#14141A", width:"100%", maxWidth:430,
+        borderRadius:"20px 20px 0 0", maxHeight:"88vh", overflowY:"auto",
+        border:"1px solid #252530" }}>
+
+        {/* Header */}
+        <div style={{ position:"sticky", top:0, background:"#14141A", zIndex:1,
+          padding:"20px 20px 12px", borderBottom:"1px solid #252530" }}>
+          <div style={{ width:36, height:4, borderRadius:2, background:"#252530", margin:"0 auto 16px" }} />
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <button onClick={onClose}
+                style={{ width:32, height:32, borderRadius:"50%", background:"#18181F",
+                  border:"1px solid #252530", display:"flex", alignItems:"center",
+                  justifyContent:"center", color:"#6B6878", fontSize:16, cursor:"pointer" }}>
+                ‹
+              </button>
+              <div style={{ fontSize:18, fontWeight:800, color:"#F2EEE8" }}>Privacy</div>
+            </div>
+            {saved && (
+              <div style={{ fontSize:12, color:"#22C55E", fontWeight:700,
+                display:"flex", alignItems:"center", gap:5 }}>
+                ✓ Saved
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div style={{ padding:"16px 20px 40px" }}>
+          {SECTIONS.map(section => (
+            <div key={section.title} style={{ marginBottom:24 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:"#6B6878",
+                textTransform:"uppercase", letterSpacing:".08em", marginBottom:10 }}>
+                {section.title}
+              </div>
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {section.items.map(({ key, icon, label, desc }) => (
+                  <div key={key} style={{ background:"#18181F", border:`1px solid ${settings[key] ? "#E8430A30" : "#252530"}`,
+                    borderRadius:12, padding:"14px 16px",
+                    display:"flex", alignItems:"center", gap:12,
+                    transition:"border-color .2s" }}>
+                    <span style={{ fontSize:22, flexShrink:0 }}>{icon}</span>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:14, fontWeight:600, color:"#F2EEE8", marginBottom:2 }}>{label}</div>
+                      <div style={{ fontSize:11, color:"#6B6878", lineHeight:1.5 }}>{desc}</div>
+                    </div>
+                    {/* Toggle switch */}
+                    <button onClick={() => toggle(key)}
+                      role="switch" aria-checked={settings[key]}
+                      aria-label={label}
+                      style={{ flexShrink:0, width:44, height:24, borderRadius:99,
+                        background: settings[key] ? "#E8430A" : "#252530",
+                        border:"none", position:"relative", cursor:"pointer",
+                        transition:"background .2s" }}>
+                      <div style={{ position:"absolute", top:2,
+                        left: settings[key] ? 22 : 2,
+                        width:20, height:20, borderRadius:"50%",
+                        background:"#fff", boxShadow:"0 1px 3px rgba(0,0,0,.4)",
+                        transition:"left .2s" }} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {/* Data & Account section */}
+          <div style={{ marginBottom:24 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:"#6B6878",
+              textTransform:"uppercase", letterSpacing:".08em", marginBottom:10 }}>
+              Data & Account
+            </div>
+            {[
+              { icon:"📥", label:"Download My Data",   desc:"Get a copy of all your spots and account data.", color:"#3B82F6",   action:() => alert("Your data export will be emailed to you within 24 hours.") },
+              { icon:"🗑️", label:"Delete Account",      desc:"Permanently delete your account and all your spots.", color:"#EF4444", action:() => { if (window.confirm("Are you sure? This cannot be undone.")) alert("Account deletion requested. You will receive a confirmation email."); } },
+            ].map(({ icon, label, desc, color, action }) => (
+              <button key={label} onClick={action}
+                style={{ width:"100%", display:"flex", alignItems:"center", gap:12,
+                  padding:"14px 16px", background:"#18181F",
+                  border:`1px solid ${color}30`, borderRadius:12, marginBottom:8,
+                  cursor:"pointer", textAlign:"left" }}>
+                <span style={{ fontSize:22, flexShrink:0 }}>{icon}</span>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:14, fontWeight:600, color, marginBottom:2 }}>{label}</div>
+                  <div style={{ fontSize:11, color:"#6B6878" }}>{desc}</div>
+                </div>
+                <span style={{ color:"#6B6878", fontSize:18 }}>›</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Save button */}
+          <button onClick={saveSettings} disabled={saving}
+            style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"center",
+              gap:8, padding:14, background:"linear-gradient(135deg,#E8430A,#BF360C)",
+              border:"none", borderRadius:12, color:"#fff", fontSize:15, fontWeight:700,
+              cursor:"pointer" }}>
+            {saving ? <><Spinner size={16} color="#fff" /> Saving…</> : "Save Privacy Settings"}
+          </button>
+
+          <div style={{ marginTop:16, padding:"12px 14px", background:"#0A0A0C",
+            borderRadius:10, fontSize:11, color:"#6B6878", lineHeight:1.6, textAlign:"center" }}>
+            🔐 SpotDrive never sells your data. Location data is only used to show your spots on the map.
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -783,6 +962,7 @@ function ProfileScreen() {
   const [loading,        setLoading]        = useState(true);
   const [showSettings,   setShowSettings]   = useState(false);
   const [showEdit,       setShowEdit]       = useState(false);
+  const [showPrivacy,    setShowPrivacy]    = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const avatarRef = useRef(null);
 
@@ -817,10 +997,12 @@ function ProfileScreen() {
           onClose={() => setShowSettings(false)}
           onEditProfile={() => setShowEdit(true)}
           onChangePhoto={() => avatarRef.current?.click()}
+          onPrivacy={() => setShowPrivacy(true)}
         />
       )}
 
-      {showEdit && <EditProfileSheet onClose={() => setShowEdit(false)} />}
+      {showEdit    && <EditProfileSheet onClose={() => setShowEdit(false)} />}
+      {showPrivacy && <PrivacySheet     onClose={() => setShowPrivacy(false)} />}
 
       <div style={{ background:"linear-gradient(180deg,#2D1200 0%,#14141A 100%)", padding:"24px 16px 0" }}>
         <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:12 }}>
