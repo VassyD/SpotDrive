@@ -2688,6 +2688,394 @@ function SearchScreen() {
   );
 }
 
+// ─── MAP SCREEN ───────────────────────────────────────────────
+const HOT_CITIES = [
+  { id:"c1",  name:"Tokyo",         country:"Japan",        lat:35.6762, lng:139.6503, spots:1847, heat:10, icon:"🇯🇵" },
+  { id:"c2",  name:"Monaco",        country:"Monaco",       lat:43.7384, lng:7.4246,   spots:1203, heat:9,  icon:"🇲🇨" },
+  { id:"c3",  name:"Dubai",         country:"UAE",          lat:25.2048, lng:55.2708,  spots:2341, heat:10, icon:"🇦🇪" },
+  { id:"c4",  name:"Los Angeles",   country:"USA",          lat:34.0522, lng:-118.2437,spots:1654, heat:9,  icon:"🇺🇸" },
+  { id:"c5",  name:"London",        country:"UK",           lat:51.5074, lng:-0.1278,  spots:987,  heat:7,  icon:"🇬🇧" },
+  { id:"c6",  name:"Beverly Hills", country:"USA",          lat:34.0736, lng:-118.4004,spots:743,  heat:8,  icon:"🇺🇸" },
+  { id:"c7",  name:"Nürburgring",   country:"Germany",      lat:50.3356, lng:6.9475,   spots:612,  heat:7,  icon:"🇩🇪" },
+  { id:"c8",  name:"Miami",         country:"USA",          lat:25.7617, lng:-80.1918, spots:891,  heat:8,  icon:"🇺🇸" },
+  { id:"c9",  name:"Singapore",     country:"Singapore",    lat:1.3521,  lng:103.8198, spots:534,  heat:6,  icon:"🇸🇬" },
+  { id:"c10", name:"Sydney",        country:"Australia",    lat:-33.8688,lng:151.2093, spots:423,  heat:5,  icon:"🇦🇺" },
+  { id:"c11", name:"Paris",         country:"France",       lat:48.8566, lng:2.3522,   spots:678,  heat:6,  icon:"🇫🇷" },
+  { id:"c12", name:"Abu Dhabi",     country:"UAE",          lat:24.4539, lng:54.3773,  spots:445,  heat:6,  icon:"🇦🇪" },
+];
+
+const RECENT_SPOTS_MAP = [
+  { id:"rs1", make:"Bugatti",    model:"Chiron SS",   rarity:"Hypercar", city:"Tokyo",       handle:"jdm_tokyo",    time:"12m ago", image:"https://images.unsplash.com/photo-1525609004556-c46c7d6cf023?w=300&q=80" },
+  { id:"rs2", make:"Ferrari",    model:"SF90",        rarity:"Hypercar", city:"Monaco",      handle:"euro_spotter", time:"34m ago", image:"https://images.unsplash.com/photo-1583121274602-3e2820c69888?w=300&q=80" },
+  { id:"rs3", make:"Lamborghini",model:"Huracán STO", rarity:"Exotic",   city:"Beverly Hills",handle:"apex_hunter",  time:"1h ago",  image:"https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=300&q=80" },
+  { id:"rs4", make:"McLaren",    model:"765LT",       rarity:"Exotic",   city:"Dubai",       handle:"gulf_spots",   time:"2h ago",  image:"https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=300&q=80" },
+  { id:"rs5", make:"Porsche",    model:"GT3 RS",      rarity:"Sports",   city:"Nürburgring", handle:"nring_nut",    time:"3h ago",  image:"https://images.unsplash.com/photo-1493238792000-8113da705763?w=300&q=80" },
+];
+
+const RARITY_COLOR = { Hypercar:"#b388ff", Exotic:"#E8430A", Sports:"#60a5fa" };
+
+function MapScreen() {
+  const [selectedCity, setSelectedCity] = useState(null);
+  const [filter,       setFilter]       = useState("all"); // all | hypercar | exotic | sports
+  const [view,         setView]         = useState("globe"); // globe | list
+  const [liveCount,    setLiveCount]    = useState(14837);
+  const mapRef = useRef(null);
+
+  // Simulate live count ticking
+  useEffect(() => {
+    const t = setInterval(() => setLiveCount(n => n + Math.floor(Math.random()*3)), 8000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Filtered cities
+  const cities = HOT_CITIES.filter(c => {
+    if (filter === "all") return true;
+    return true; // all rarity types appear per city for now
+  });
+
+  // Heat colour: 1-10 scale
+  const heatColor = (heat) => {
+    if (heat >= 9) return "#E8430A";
+    if (heat >= 7) return "#F97316";
+    if (heat >= 5) return "#EAB308";
+    return "#22C55E";
+  };
+  const heatLabel = (heat) => {
+    if (heat >= 9) return "🔥 On Fire";
+    if (heat >= 7) return "⚡ Hot";
+    if (heat >= 5) return "✅ Active";
+    return "🟢 Quiet";
+  };
+
+  // World map SVG simplified projection (equirectangular)
+  const project = (lat, lng, w, h) => ({
+    x: ((lng + 180) / 360) * w,
+    y: ((90 - lat) / 180) * h,
+  });
+
+  const W = 380, H = 200;
+
+  return (
+    <div style={{ height:"calc(100vh - 120px)", display:"flex", flexDirection:"column", overflow:"hidden" }}>
+
+      {/* Header */}
+      <div style={{ padding:"12px 14px 8px", flexShrink:0 }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
+          <div>
+            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:20,
+              fontWeight:900, color:"#F2EEE8" }}>SpotDrive Map</div>
+            <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:2 }}>
+              <div style={{ width:6, height:6, borderRadius:"50%", background:"#22C55E",
+                boxShadow:"0 0 6px #22C55E" }} />
+              <span style={{ fontSize:11, color:"#22C55E", fontWeight:700 }}>
+                {liveCount.toLocaleString()} spots worldwide
+              </span>
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:6 }}>
+            {["globe","list"].map(v => (
+              <button key={v} onClick={() => setView(v)}
+                style={{ padding:"6px 12px", borderRadius:8, fontSize:12, fontWeight:700,
+                  background: view===v ? "#E8430A" : "#18181F",
+                  border:`1px solid ${view===v?"#E8430A":"#252530"}`,
+                  color: view===v ? "#fff" : "#6B6878", cursor:"pointer" }}>
+                {v === "globe" ? "🌍 Map" : "📋 List"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Rarity filter */}
+        <div style={{ display:"flex", gap:6, overflowX:"auto" }}>
+          {[
+            { key:"all",      label:"All Rarity",  color:"#F2EEE8" },
+            { key:"hypercar", label:"Hypercar",     color:"#b388ff" },
+            { key:"exotic",   label:"Exotic",       color:"#E8430A" },
+            { key:"sports",   label:"Sports",       color:"#60a5fa" },
+          ].map(f => (
+            <button key={f.key} onClick={() => setFilter(f.key)}
+              style={{ padding:"5px 12px", borderRadius:20, fontSize:11, fontWeight:700,
+                whiteSpace:"nowrap", cursor:"pointer",
+                background: filter===f.key ? `${f.color}20` : "#18181F",
+                border:`1px solid ${filter===f.key ? f.color : "#252530"}`,
+                color: filter===f.key ? f.color : "#6B6878" }}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* GLOBE VIEW — SVG world map with heat pins */}
+      {view === "globe" && (
+        <div style={{ flex:1, overflowY:"auto" }}>
+          <div ref={mapRef} style={{ margin:"0 14px 14px",
+            background:"#0D1117", border:"1px solid #252530", borderRadius:16,
+            overflow:"hidden", position:"relative" }}>
+
+            {/* Ocean background */}
+            <svg viewBox={`0 0 ${W} ${H}`} style={{ width:"100%", display:"block" }}>
+              {/* Ocean */}
+              <rect width={W} height={H} fill="#0D1117" />
+
+              {/* Very simplified continent outlines */}
+              {/* North America */}
+              <path d="M60,40 L90,35 L105,50 L100,70 L80,85 L65,75 L55,60 Z" fill="#1a1a2e" stroke="#252530" strokeWidth=".5"/>
+              {/* South America */}
+              <path d="M85,90 L100,85 L110,100 L105,130 L90,135 L80,120 L78,100 Z" fill="#1a1a2e" stroke="#252530" strokeWidth=".5"/>
+              {/* Europe */}
+              <path d="M170,38 L195,32 L205,42 L200,55 L185,58 L175,50 Z" fill="#1a1a2e" stroke="#252530" strokeWidth=".5"/>
+              {/* Africa */}
+              <path d="M185,60 L210,55 L220,75 L215,110 L195,118 L178,100 L175,75 Z" fill="#1a1a2e" stroke="#252530" strokeWidth=".5"/>
+              {/* Asia */}
+              <path d="M205,30 L270,25 L295,40 L290,65 L255,70 L220,60 L205,45 Z" fill="#1a1a2e" stroke="#252530" strokeWidth=".5"/>
+              {/* Australia */}
+              <path d="M275,110 L305,105 L315,120 L305,135 L280,135 L270,122 Z" fill="#1a1a2e" stroke="#252530" strokeWidth=".5"/>
+              {/* Japan (small) */}
+              <path d="M290,55 L298,52 L302,58 L296,62 L290,60 Z" fill="#1a1a2e" stroke="#252530" strokeWidth=".3"/>
+
+              {/* Grid lines */}
+              {[-60,-30,0,30,60].map(lat => {
+                const y = ((90-lat)/180)*H;
+                return <line key={lat} x1={0} y1={y} x2={W} y2={y} stroke="#ffffff08" strokeWidth=".5"/>;
+              })}
+              {[-120,-60,0,60,120].map(lng => {
+                const x = ((lng+180)/360)*W;
+                return <line key={lng} x1={x} y1={0} x2={x} y2={H} stroke="#ffffff08" strokeWidth=".5"/>;
+              })}
+
+              {/* Heat blobs */}
+              {cities.map(c => {
+                const p = project(c.lat, c.lng, W, H);
+                const r = 8 + c.heat * 2.5;
+                const col = heatColor(c.heat);
+                return (
+                  <g key={c.id}>
+                    {/* Glow ring */}
+                    <circle cx={p.x} cy={p.y} r={r} fill={col} opacity={0.08} />
+                    <circle cx={p.x} cy={p.y} r={r*0.6} fill={col} opacity={0.15} />
+                    {/* Core dot */}
+                    <circle cx={p.x} cy={p.y} r={Math.max(4, c.heat * 0.8)}
+                      fill={col} opacity={0.9}
+                      style={{ cursor:"pointer" }}
+                      onClick={() => setSelectedCity(c)} />
+                    {/* Pulse ring on hottest */}
+                    {c.heat >= 9 && (
+                      <circle cx={p.x} cy={p.y} r={r*1.2} fill="none"
+                        stroke={col} strokeWidth="1" opacity={0.3} />
+                    )}
+                  </g>
+                );
+              })}
+
+              {/* City labels for top 4 */}
+              {cities.filter(c => c.heat >= 9).map(c => {
+                const p = project(c.lat, c.lng, W, H);
+                return (
+                  <text key={`label-${c.id}`} x={p.x} y={p.y - 12}
+                    textAnchor="middle" fill="#F2EEE8" fontSize="7"
+                    fontWeight="700" opacity={0.9}
+                    style={{ pointerEvents:"none" }}>
+                    {c.name}
+                  </text>
+                );
+              })}
+            </svg>
+
+            {/* Legend */}
+            <div style={{ position:"absolute", bottom:10, left:10,
+              background:"rgba(10,10,12,.85)", borderRadius:8, padding:"6px 10px",
+              backdropFilter:"blur(6px)", border:"1px solid #252530" }}>
+              <div style={{ fontSize:9, color:"#6B6878", fontWeight:700,
+                textTransform:"uppercase", letterSpacing:".05em", marginBottom:5 }}>Heat</div>
+              {[
+                { label:"On Fire", color:"#E8430A" },
+                { label:"Hot",     color:"#F97316" },
+                { label:"Active",  color:"#EAB308" },
+                { label:"Quiet",   color:"#22C55E" },
+              ].map(({ label, color }) => (
+                <div key={label} style={{ display:"flex", alignItems:"center",
+                  gap:5, marginBottom:2 }}>
+                  <div style={{ width:8, height:8, borderRadius:"50%", background:color }} />
+                  <span style={{ fontSize:9, color:"#AAA6A0" }}>{label}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Tap hint */}
+            <div style={{ position:"absolute", bottom:10, right:10,
+              background:"rgba(10,10,12,.85)", borderRadius:8, padding:"5px 9px",
+              backdropFilter:"blur(6px)", border:"1px solid #252530",
+              fontSize:9, color:"#6B6878" }}>
+              Tap a dot to explore
+            </div>
+          </div>
+
+          {/* City detail card */}
+          {selectedCity && (
+            <div style={{ margin:"0 14px 14px", background:"#14141A",
+              border:`1px solid ${heatColor(selectedCity.heat)}40`,
+              borderRadius:14, overflow:"hidden",
+              borderTop:`3px solid ${heatColor(selectedCity.heat)}` }}>
+              <div style={{ padding:"14px 16px", borderBottom:"1px solid #252530",
+                display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <span style={{ fontSize:24 }}>{selectedCity.icon}</span>
+                  <div>
+                    <div style={{ fontFamily:"'Barlow Condensed',sans-serif",
+                      fontSize:20, fontWeight:900, color:"#F2EEE8" }}>
+                      {selectedCity.name}
+                    </div>
+                    <div style={{ fontSize:11, color:"#6B6878" }}>{selectedCity.country}</div>
+                  </div>
+                </div>
+                <div style={{ textAlign:"right" }}>
+                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif",
+                    fontSize:22, fontWeight:900, color:heatColor(selectedCity.heat) }}>
+                    {selectedCity.spots.toLocaleString()}
+                  </div>
+                  <div style={{ fontSize:10, color:"#6B6878" }}>spots</div>
+                </div>
+              </div>
+              <div style={{ padding:"10px 16px", display:"flex", alignItems:"center",
+                justifyContent:"space-between" }}>
+                <div style={{ fontSize:12, color:heatColor(selectedCity.heat),
+                  fontWeight:700 }}>
+                  {heatLabel(selectedCity.heat)}
+                </div>
+                <button onClick={() => setSelectedCity(null)}
+                  style={{ fontSize:11, color:"#6B6878", background:"none",
+                    border:"none", cursor:"pointer" }}>
+                  Close ×
+                </button>
+              </div>
+              {/* Recent from this city */}
+              <div style={{ padding:"0 16px 14px" }}>
+                <div style={{ fontSize:10, color:"#6B6878", fontWeight:700,
+                  textTransform:"uppercase", letterSpacing:".06em", marginBottom:8 }}>
+                  Recent from {selectedCity.name}
+                </div>
+                <div style={{ display:"flex", gap:8, overflowX:"auto" }}>
+                  {RECENT_SPOTS_MAP
+                    .filter(s => s.city.toLowerCase().includes(selectedCity.name.toLowerCase())
+                              || selectedCity.name.toLowerCase().includes(s.city.toLowerCase()))
+                    .concat(RECENT_SPOTS_MAP)
+                    .slice(0, 4)
+                    .map((s, i) => (
+                      <div key={`${s.id}-${i}`} style={{ flexShrink:0, width:80 }}>
+                        <div style={{ width:80, height:80, borderRadius:10, overflow:"hidden",
+                          position:"relative", marginBottom:5 }}>
+                          <img src={s.image} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                          <div style={{ position:"absolute", inset:0,
+                            background:"linear-gradient(to bottom,transparent 50%,rgba(0,0,0,.7))" }} />
+                          <div style={{ position:"absolute", top:4, left:4 }}>
+                            <span style={{ fontSize:8, fontWeight:700,
+                              color:RARITY_COLOR[s.rarity]||"#60a5fa",
+                              background:`${RARITY_COLOR[s.rarity]||"#60a5fa"}20`,
+                              border:`1px solid ${RARITY_COLOR[s.rarity]||"#60a5fa"}`,
+                              borderRadius:4, padding:"1px 4px" }}>
+                              {s.rarity.toUpperCase().slice(0,4)}
+                            </span>
+                          </div>
+                        </div>
+                        <div style={{ fontSize:9, fontWeight:700, color:"#F2EEE8",
+                          overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                          {s.make}
+                        </div>
+                        <div style={{ fontSize:9, color:"#6B6878" }}>{s.time}</div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Recent activity feed */}
+          <div style={{ margin:"0 14px 14px" }}>
+            <div style={{ fontSize:12, fontWeight:700, color:"#6B6878",
+              textTransform:"uppercase", letterSpacing:".06em", marginBottom:10,
+              display:"flex", alignItems:"center", gap:6 }}>
+              <div style={{ width:6, height:6, borderRadius:"50%", background:"#E8430A",
+                boxShadow:"0 0 6px #E8430A" }} />
+              Live Spots
+            </div>
+            {RECENT_SPOTS_MAP.map(s => (
+              <div key={s.id} style={{ display:"flex", gap:10, padding:"10px 0",
+                borderBottom:"1px solid #252530", alignItems:"center" }}>
+                <div style={{ width:52, height:52, borderRadius:10, overflow:"hidden", flexShrink:0 }}>
+                  <img src={s.image} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif",
+                    fontSize:16, fontWeight:900, color:"#F2EEE8", lineHeight:1 }}>
+                    {s.make} {s.model}
+                  </div>
+                  <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:3 }}>
+                    <span style={{ fontSize:10, color:RARITY_COLOR[s.rarity],
+                      background:`${RARITY_COLOR[s.rarity]}20`,
+                      border:`1px solid ${RARITY_COLOR[s.rarity]}`,
+                      borderRadius:4, padding:"1px 6px", fontWeight:700 }}>
+                      {s.rarity}
+                    </span>
+                    <span style={{ fontSize:11, color:"#6B6878" }}>📍 {s.city}</span>
+                  </div>
+                  <div style={{ fontSize:11, color:"#6B6878", marginTop:2 }}>
+                    @{s.handle} · {s.time}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* LIST VIEW — city leaderboard */}
+      {view === "list" && (
+        <div style={{ flex:1, overflowY:"auto", padding:"0 14px 14px" }}>
+          <div style={{ fontSize:11, color:"#6B6878", fontWeight:700,
+            textTransform:"uppercase", letterSpacing:".06em",
+            padding:"10px 0 8px", marginBottom:4 }}>
+            {cities.length} cities · ranked by activity
+          </div>
+          {[...cities].sort((a,b) => b.spots - a.spots).map((c, i) => (
+            <div key={c.id} onClick={() => { setSelectedCity(c); setView("globe"); }}
+              style={{ display:"flex", alignItems:"center", gap:12,
+                padding:"13px 0", borderBottom:"1px solid #252530", cursor:"pointer" }}>
+              {/* Rank */}
+              <div style={{ width:28, textAlign:"center", flexShrink:0,
+                fontFamily:"'Barlow Condensed',sans-serif", fontSize:16, fontWeight:900,
+                color: i===0?"#C9A84C":i===1?"#AAA6A0":i===2?"#CD7F32":"#3D3D4E" }}>
+                {i+1}
+              </div>
+              <span style={{ fontSize:24, flexShrink:0 }}>{c.icon}</span>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <span style={{ fontSize:14, fontWeight:700, color:"#F2EEE8" }}>{c.name}</span>
+                  <span style={{ fontSize:10, color:heatColor(c.heat),
+                    fontWeight:700 }}>{heatLabel(c.heat)}</span>
+                </div>
+                <div style={{ fontSize:11, color:"#6B6878" }}>{c.country}</div>
+                {/* Activity bar */}
+                <div style={{ marginTop:5, height:3, background:"#252530", borderRadius:2 }}>
+                  <div style={{ height:"100%", borderRadius:2,
+                    background:`linear-gradient(90deg,${heatColor(c.heat)},${heatColor(c.heat)}88)`,
+                    width:`${(c.spots/2400)*100}%` }} />
+                </div>
+              </div>
+              <div style={{ textAlign:"right", flexShrink:0 }}>
+                <div style={{ fontFamily:"'Barlow Condensed',sans-serif",
+                  fontSize:18, fontWeight:900, color:heatColor(c.heat) }}>
+                  {c.spots.toLocaleString()}
+                </div>
+                <div style={{ fontSize:10, color:"#6B6878" }}>spots</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MainApp() {
   const [screen,      setScreen]      = useState("feed");
   const [showNotifs,  setShowNotifs]  = useState(false);
@@ -2699,7 +3087,7 @@ function MainApp() {
     { key:"feed",    label:"Feed",    icon:"🏠" },
     { key:"explore", label:"Explore", icon:"🧭" },
     { key:"upload",  label:"",        icon:null  },
-    { key:"search",  label:"Search",  icon:"🔍"  },
+    { key:"map",     label:"Map",     icon:"🗺️"  },
     { key:"profile", label:"Profile", icon:"👤"  },
   ];
 
@@ -2743,6 +3131,7 @@ function MainApp() {
         {screen==="feed"    && <FeedScreen    onSpotTap={setSpotDetail} />}
         {screen==="explore" && <ExploreScreen onSpotTap={setSpotDetail} />}
         {screen==="search"  && <SearchScreen />}
+        {screen==="map"     && <MapScreen />}
         {screen==="profile" && <ProfileScreen />}
       </main>
 
