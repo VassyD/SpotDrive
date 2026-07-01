@@ -547,7 +547,7 @@ function UploadModal({ onClose }) {
 }
 
 // ─── SETTINGS SHEET ───────────────────────────────────────────
-function SettingsSheet({ onClose, onEditProfile, onChangePhoto, onPrivacy }) {
+function SettingsSheet({ onClose, onEditProfile, onChangePhoto, onPrivacy, onNotifications }) {
   const { user, profile, signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
 
@@ -575,7 +575,7 @@ function SettingsSheet({ onClose, onEditProfile, onChangePhoto, onPrivacy }) {
         {[
           { icon:"👤", label:"Edit Profile",  action:() => { onClose(); onEditProfile(); } },
           { icon:"📸", label:"Change Photo",   action:() => { onClose(); onChangePhoto(); } },
-          { icon:"🔔", label:"Notifications", action:onClose },
+          { icon:"🔔", label:"Notifications", action:() => { onClose(); onNotifications(); } },
           { icon:"🔒", label:"Privacy",        action:() => { onClose(); onPrivacy(); } },
         ].map(({ icon, label, action }) => (
           <button key={label} onClick={action}
@@ -592,6 +592,246 @@ function SettingsSheet({ onClose, onEditProfile, onChangePhoto, onPrivacy }) {
             borderRadius:12, color:"#EF4444", fontSize:14, fontWeight:700, cursor:"pointer", marginTop:4 }}>
           {signingOut ? <Spinner size={14} color="#EF4444" /> : "🚪 Sign Out"}
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── NOTIFICATION SETTINGS SHEET ─────────────────────────────
+function NotificationSettingsSheet({ onClose }) {
+  const { user, fetchProfile } = useAuth();
+
+  const [settings, setSettings] = useState({
+    muteAll:        false,
+    likes:          true,
+    comments:       true,
+    follows:        true,
+    saves:          true,
+    mentions:       true,
+    weeklyDigest:   true,
+    newSpotNearby:  false,
+    pushEnabled:    true,
+    emailEnabled:   false,
+    muteUntil:      null, // null = not muted, or ISO date string
+  });
+  const [saving,  setSaving]  = useState(false);
+  const [saved,   setSaved]   = useState(false);
+  const [muteMenu, setMuteMenu] = useState(false);
+
+  const toggle = (key) => {
+    setSettings(p => ({ ...p, [key]: !p[key] }));
+  };
+
+  const muteDuration = (hours) => {
+    const until = hours === null ? null : new Date(Date.now() + hours * 3600000).toISOString();
+    setSettings(p => ({ ...p, muteAll: hours !== null, muteUntil: until }));
+    setMuteMenu(false);
+  };
+
+  const muteLabel = () => {
+    if (!settings.muteAll) return null;
+    if (!settings.muteUntil) return "Muted indefinitely";
+    const h = Math.round((new Date(settings.muteUntil) - Date.now()) / 3600000);
+    if (h < 1) return "Muted (expiring soon)";
+    if (h < 24) return `Muted for ${h}h`;
+    return `Muted for ${Math.round(h/24)}d`;
+  };
+
+  const save = async () => {
+    setSaving(true); setSaved(false);
+    // In production: save to user preferences table
+    // For now: persist in localStorage as fallback
+    try {
+      localStorage.setItem(`notif_prefs_${user?.id}`, JSON.stringify(settings));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch(e) { console.error(e); }
+    finally { setSaving(false); }
+  };
+
+  const SECTIONS = [
+    {
+      title: "Mute",
+      items: [], // handled separately below
+      custom: true,
+    },
+    {
+      title: "Activity",
+      items: [
+        { key:"likes",     icon:"❤️", color:"#E8430A", label:"Likes",          desc:"When someone likes your spot" },
+        { key:"comments",  icon:"💬", color:"#9B59B6", label:"Comments",       desc:"When someone comments on your spot" },
+        { key:"follows",   icon:"👤", color:"#3B82F6", label:"New Followers",  desc:"When someone starts following you" },
+        { key:"saves",     icon:"🔖", color:"#C9A84C", label:"Saves",          desc:"When someone saves your spot" },
+        { key:"mentions",  icon:"@",  color:"#22C55E", label:"Mentions",       desc:"When someone mentions you in a post" },
+      ],
+    },
+    {
+      title: "Discovery",
+      items: [
+        { key:"newSpotNearby", icon:"📍", color:"#E8430A", label:"Spots Near Me",   desc:"When a rare car is spotted in your area" },
+        { key:"weeklyDigest",  icon:"📰", color:"#3B82F6", label:"Weekly Digest",   desc:"A weekly summary of top spots" },
+      ],
+    },
+    {
+      title: "Delivery",
+      items: [
+        { key:"pushEnabled",  icon:"📲", color:"#22C55E", label:"Push Notifications", desc:"Alerts on your phone" },
+        { key:"emailEnabled", icon:"📧", color:"#3B82F6", label:"Email Notifications", desc:"Sent to your registered email" },
+      ],
+    },
+  ];
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.8)", zIndex:800,
+      backdropFilter:"blur(6px)", display:"flex", alignItems:"flex-end", justifyContent:"center" }}
+      onClick={e => { if (e.target===e.currentTarget) onClose(); }}>
+      <div style={{ background:"#14141A", width:"100%", maxWidth:430,
+        borderRadius:"20px 20px 0 0", maxHeight:"88vh", overflowY:"auto",
+        border:"1px solid #252530" }}>
+
+        {/* Header */}
+        <div style={{ position:"sticky", top:0, background:"#14141A", zIndex:1,
+          padding:"20px 20px 12px", borderBottom:"1px solid #252530" }}>
+          <div style={{ width:36, height:4, borderRadius:2, background:"#252530", margin:"0 auto 16px" }} />
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <button onClick={onClose}
+                style={{ width:32, height:32, borderRadius:"50%", background:"#18181F",
+                  border:"1px solid #252530", display:"flex", alignItems:"center",
+                  justifyContent:"center", color:"#6B6878", fontSize:16, cursor:"pointer" }}>
+                ‹
+              </button>
+              <div style={{ fontSize:18, fontWeight:800, color:"#F2EEE8" }}>Notifications</div>
+            </div>
+            {saved && <div style={{ fontSize:12, color:"#22C55E", fontWeight:700 }}>✓ Saved</div>}
+          </div>
+        </div>
+
+        <div style={{ padding:"16px 20px 40px" }}>
+
+          {/* Mute section */}
+          <div style={{ marginBottom:24 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:"#6B6878",
+              textTransform:"uppercase", letterSpacing:".08em", marginBottom:10 }}>
+              Mute
+            </div>
+            {/* Mute all toggle */}
+            <div style={{ background: settings.muteAll ? "#2D1200" : "#18181F",
+              border:`1px solid ${settings.muteAll ? "#E8430A50" : "#252530"}`,
+              borderRadius:12, padding:"14px 16px", marginBottom:8, transition:"all .2s" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <span style={{ fontSize:22, flexShrink:0 }}>🔕</span>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:14, fontWeight:600, color:"#F2EEE8", marginBottom:2 }}>
+                    Mute All Notifications
+                  </div>
+                  <div style={{ fontSize:11, color: settings.muteAll ? "#E8430A" : "#6B6878" }}>
+                    {settings.muteAll ? muteLabel() : "Pause all notifications temporarily"}
+                  </div>
+                </div>
+                <button onClick={() => toggle("muteAll")}
+                  role="switch" aria-checked={settings.muteAll}
+                  style={{ flexShrink:0, width:44, height:24, borderRadius:99,
+                    background: settings.muteAll ? "#E8430A" : "#252530",
+                    border:"none", position:"relative", cursor:"pointer", transition:"background .2s" }}>
+                  <div style={{ position:"absolute", top:2, left:settings.muteAll?22:2,
+                    width:20, height:20, borderRadius:"50%", background:"#fff",
+                    boxShadow:"0 1px 3px rgba(0,0,0,.4)", transition:"left .2s" }} />
+                </button>
+              </div>
+            </div>
+
+            {/* Mute duration picker */}
+            <div style={{ position:"relative" }}>
+              <button onClick={() => setMuteMenu(m => !m)}
+                style={{ width:"100%", display:"flex", alignItems:"center", gap:12, padding:"12px 16px",
+                  background:"#18181F", border:"1px solid #252530", borderRadius:12,
+                  color:"#F2EEE8", fontSize:13, fontWeight:600, cursor:"pointer", textAlign:"left" }}>
+                <span style={{ fontSize:18 }}>⏱️</span>
+                <span style={{ flex:1 }}>Mute for a specific time</span>
+                <span style={{ color:"#6B6878", fontSize:16 }}>{muteMenu?"∧":"∨"}</span>
+              </button>
+              {muteMenu && (
+                <div style={{ position:"absolute", top:"calc(100% + 4px)", left:0, right:0, zIndex:10,
+                  background:"#1C1C24", border:"1px solid #252530", borderRadius:12, overflow:"hidden",
+                  boxShadow:"0 8px 24px rgba(0,0,0,.5)" }}>
+                  {[
+                    { label:"For 1 hour",    hours:1    },
+                    { label:"For 4 hours",   hours:4    },
+                    { label:"For 8 hours",   hours:8    },
+                    { label:"For 24 hours",  hours:24   },
+                    { label:"For 1 week",    hours:168  },
+                    { label:"Until I turn it back on", hours:null },
+                    { label:"Unmute",        hours:-1   },
+                  ].map(({ label, hours }) => (
+                    <button key={label}
+                      onClick={() => hours === -1 ? muteDuration(null) : muteDuration(hours === null ? Infinity : hours)}
+                      style={{ width:"100%", padding:"12px 16px", background:"none",
+                        border:"none", borderBottom:"1px solid #252530",
+                        color: hours === -1 ? "#22C55E" : "#F2EEE8",
+                        fontSize:13, fontWeight:600, cursor:"pointer", textAlign:"left",
+                        display:"flex", alignItems:"center", gap:8 }}>
+                      {hours === -1 ? "🔔" : hours === null ? "🔕" : "⏱️"} {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Activity, Discovery, Delivery sections */}
+          {SECTIONS.filter(s => !s.custom).map(section => (
+            <div key={section.title} style={{ marginBottom:24 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:"#6B6878",
+                textTransform:"uppercase", letterSpacing:".08em", marginBottom:10 }}>
+                {section.title}
+              </div>
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {section.items.map(({ key, icon, color, label, desc }) => {
+                  const isOn = settings[key] && !settings.muteAll;
+                  return (
+                    <div key={key} style={{ background:"#18181F",
+                      border:`1px solid ${isOn ? color+"30" : "#252530"}`,
+                      borderRadius:12, padding:"13px 16px",
+                      display:"flex", alignItems:"center", gap:12,
+                      opacity: settings.muteAll ? 0.5 : 1, transition:"all .2s" }}>
+                      <span style={{ fontSize:20, flexShrink:0 }}>{icon}</span>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:14, fontWeight:600, color:"#F2EEE8", marginBottom:2 }}>{label}</div>
+                        <div style={{ fontSize:11, color:"#6B6878" }}>{desc}</div>
+                      </div>
+                      <button onClick={() => !settings.muteAll && toggle(key)}
+                        role="switch" aria-checked={isOn}
+                        aria-label={label}
+                        style={{ flexShrink:0, width:44, height:24, borderRadius:99,
+                          background: isOn ? color : "#252530",
+                          border:"none", position:"relative",
+                          cursor: settings.muteAll ? "not-allowed" : "pointer",
+                          transition:"background .2s" }}>
+                        <div style={{ position:"absolute", top:2, left:isOn?22:2,
+                          width:20, height:20, borderRadius:"50%", background:"#fff",
+                          boxShadow:"0 1px 3px rgba(0,0,0,.4)", transition:"left .2s" }} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {/* Save */}
+          <button onClick={save} disabled={saving}
+            style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"center",
+              gap:8, padding:14, background:"linear-gradient(135deg,#E8430A,#BF360C)",
+              border:"none", borderRadius:12, color:"#fff", fontSize:15, fontWeight:700, cursor:"pointer" }}>
+            {saving ? <><Spinner size={16} color="#fff" /> Saving…</> : "Save Notification Settings"}
+          </button>
+
+          <div style={{ marginTop:12, padding:"10px 14px", background:"#0A0A0C",
+            borderRadius:10, fontSize:11, color:"#6B6878", lineHeight:1.6, textAlign:"center" }}>
+            🔔 You can mute all notifications at any time without losing your settings.
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -960,10 +1200,11 @@ function ProfileScreen() {
   const { user, profile, fetchProfile } = useAuth();
   const [spots,          setSpots]          = useState([]);
   const [loading,        setLoading]        = useState(true);
-  const [showSettings,   setShowSettings]   = useState(false);
-  const [showEdit,       setShowEdit]       = useState(false);
-  const [showPrivacy,    setShowPrivacy]    = useState(false);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [showSettings,      setShowSettings]      = useState(false);
+  const [showEdit,          setShowEdit]          = useState(false);
+  const [showPrivacy,       setShowPrivacy]       = useState(false);
+  const [showNotifSettings, setShowNotifSettings] = useState(false);
+  const [uploadingPhoto,    setUploadingPhoto]    = useState(false);
   const avatarRef = useRef(null);
 
   useEffect(() => {
@@ -998,11 +1239,13 @@ function ProfileScreen() {
           onEditProfile={() => setShowEdit(true)}
           onChangePhoto={() => avatarRef.current?.click()}
           onPrivacy={() => setShowPrivacy(true)}
+          onNotifications={() => setShowNotifSettings(true)}
         />
       )}
 
-      {showEdit    && <EditProfileSheet onClose={() => setShowEdit(false)} />}
-      {showPrivacy && <PrivacySheet     onClose={() => setShowPrivacy(false)} />}
+      {showEdit          && <EditProfileSheet          onClose={() => setShowEdit(false)} />}
+      {showPrivacy       && <PrivacySheet              onClose={() => setShowPrivacy(false)} />}
+      {showNotifSettings && <NotificationSettingsSheet onClose={() => setShowNotifSettings(false)} />}
 
       <div style={{ background:"linear-gradient(180deg,#2D1200 0%,#14141A 100%)", padding:"24px 16px 0" }}>
         <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:12 }}>
