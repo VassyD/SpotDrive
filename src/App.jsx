@@ -2762,10 +2762,14 @@ function MapScreen() {
         attributionControl: false,
       });
 
+      // Force Leaflet to recalculate size after DOM settles
+      setTimeout(() => map.invalidateSize(), 100);
+
       // Dark tile layer (CartoDB dark matter)
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-        maxZoom: 18,
-        subdomains: "abcd",
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        subdomains: ["a","b","c","d"],
+        attribution: "© CartoDB",
       }).addTo(map);
 
       leafletRef.current = map;
@@ -2903,8 +2907,9 @@ function MapScreen() {
         </span>
       </div>
 
-      {/* Leaflet map */}
-      <div ref={mapRef} style={{ flex:1, width:"100%" }} />
+      {/* Leaflet map — must have explicit height */}
+      <div ref={mapRef} style={{ flex:1, width:"100%", minHeight:0,
+        height:"calc(100vh - 110px)" }} />
 
       {/* Loading overlay */}
       {!mapReady && (
@@ -3073,7 +3078,7 @@ function MainApp() {
         </div>
       </header>
 
-      <main style={{ flex:1, overflowY:"auto", paddingBottom:80 }}>
+      <main style={{ flex:1, overflowY: screen==="map" ? "hidden" : "auto", paddingBottom: screen==="map" ? 0 : 80 }}>
         {screen==="feed"    && <FeedScreen    onSpotTap={setSpotDetail} />}
         {screen==="explore" && <ExploreScreen onSpotTap={setSpotDetail} />}
         {screen==="search"  && <SearchScreen />}
