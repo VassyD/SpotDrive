@@ -1214,41 +1214,33 @@ function StoriesRow({ profile, onAddStory }) {
 
 function StoryViewer({ stories, initialIndex, onClose, onViewed }) {
   const { profile } = useAuth();
-  const [idx,      setIdx]      = useState(initialIndex);
-  const [progress, setProgress] = useState(0);
-  const [paused,   setPaused]   = useState(false);
-  const [imgErr,   setImgErr]   = useState(false);
-  const [reply,    setReply]    = useState("");
+  const [idx,        setIdx]        = useState(initialIndex);
+  const [progress,   setProgress]   = useState(0);
+  const [paused,     setPaused]     = useState(false);
+  const [imgErr,     setImgErr]     = useState(false);
+  const [reply,      setReply]      = useState("");
+  const [showTray,   setShowTray]   = useState(false);
+  const [swipeX,     setSwipeX]     = useState(null);
+  const [dragOffset, setDragOffset] = useState(0);
   const intervalRef = useRef(null);
-  const DURATION = 5000; // 5 seconds per story
+  const containerRef = useRef(null);
+  const DURATION = 5000;
 
   const story = stories[idx];
 
-  const goNext = useCallback(() => {
-    if (idx < stories.length - 1) {
-      setIdx(i => i + 1);
-      setProgress(0);
-      setImgErr(false);
-    } else {
-      onClose();
-    }
-  }, [idx, stories.length, onClose]);
+  const goTo = useCallback((i) => {
+    if (i < 0 || i >= stories.length) { onClose(); return; }
+    setIdx(i); setProgress(0); setImgErr(false); setDragOffset(0);
+    onViewed(i);
+  }, [stories.length, onClose, onViewed]);
 
-  const goPrev = () => {
-    if (idx > 0) {
-      setIdx(i => i - 1);
-      setProgress(0);
-      setImgErr(false);
-    }
-  };
+  const goNext = useCallback(() => goTo(idx + 1), [idx, goTo]);
+  const goPrev = useCallback(() => goTo(idx - 1), [idx, goTo]);
+
+  useEffect(() => { onViewed(idx); setProgress(0); }, [idx]);
 
   useEffect(() => {
-    onViewed(idx);
-    setProgress(0);
-  }, [idx]);
-
-  useEffect(() => {
-    if (paused) return;
+    if (paused || showTray) { clearInterval(intervalRef.current); return; }
     intervalRef.current = setInterval(() => {
       setProgress(p => {
         if (p >= 100) { goNext(); return 0; }
@@ -1256,7 +1248,28 @@ function StoryViewer({ stories, initialIndex, onClose, onViewed }) {
       });
     }, 50);
     return () => clearInterval(intervalRef.current);
-  }, [idx, paused, goNext]);
+  }, [idx, paused, showTray, goNext]);
+
+  // Swipe handlers
+  const onTouchStart = (e) => {
+    setSwipeX(e.touches[0].clientX);
+    setPaused(true);
+  };
+  const onTouchMove = (e) => {
+    if (swipeX === null) return;
+    const dx = e.touches[0].clientX - swipeX;
+    setDragOffset(dx);
+  };
+  const onTouchEnd = (e) => {
+    const dx = dragOffset;
+    setDragOffset(0);
+    setPaused(false);
+    setSwipeX(null);
+    if (Math.abs(dx) > 60) {
+      if (dx < 0) goNext(); // swipe left → next
+      else        goPrev(); // swipe right → prev
+    }
+  };
 
   const timeLeft = (expiresAt) => {
     const h = Math.floor((expiresAt - Date.now()) / 3600000);
@@ -1265,68 +1278,97 @@ function StoryViewer({ stories, initialIndex, onClose, onViewed }) {
   };
 
   const RARITY_COLOR = { Hypercar:"#b388ff", Exotic:"#E8430A", Sports:"#60a5fa" };
-
   if (!story) return null;
 
+  // Clamp drag for visual feedback
+  const clampedOffset = Math.max(-80, Math.min(80, dragOffset));
+
   return (
-    <div style={{ position:"fixed", inset:0, background:"#000", zIndex:900,
-      display:"flex", flexDirection:"column", maxWidth:430,
-      margin:"0 auto", touchAction:"none" }}>
+    <div ref={containerRef}
+      style={{ position:"fixed", inset:0, background:"#000", zIndex:900,
+        display:"flex", flexDirection:"column", maxWidth:430, margin:"0 auto",
+        touchAction:"pan-y",
+        transform:`translateX(${clampedOffset}px)`,
+        transition: swipeX === null ? "transform .2s ease" : "none" }}>
 
       {/* Progress bars */}
       <div style={{ position:"absolute", top:0, left:0, right:0, zIndex:10,
         display:"flex", gap:3, padding:"10px 10px 0" }}>
         {stories.map((_, i) => (
-          <div key={i} style={{ flex:1, height:2, background:"rgba(255,255,255,.3)",
-            borderRadius:1, overflow:"hidden" }}>
-            <div style={{ height:"100%", background:"#fff", borderRadius:1,
-              width: i < idx ? "100%" : i === idx ? `${progress}%` : "0%",
-              transition: i === idx ? "none" : "none" }} />
+          <div key={i} onClick={() => { setPaused(false); goTo(i); }}
+            style={{ flex:1, height:3, background:"rgba(255,255,255,.25)",
+              borderRadius:2, overflow:"hidden", cursor:"pointer" }}>
+            <div style={{ height:"100%", background:"#fff", borderRadius:2,
+              width: i < idx ? "100%" : i === idx ? `${progress}%` : "0%" }} />
           </div>
         ))}
       </div>
 
-      {/* Story image */}
+      {/* Story image with swipe */}
       <div style={{ flex:1, position:"relative", overflow:"hidden" }}
-        onPointerDown={() => setPaused(true)}
-        onPointerUp={() => setPaused(false)}>
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onPointerDown={e => { if (e.pointerType === "mouse") setPaused(true); }}
+        onPointerUp={e => { if (e.pointerType === "mouse") setPaused(false); }}>
+
         {story.image && !imgErr
           ? <img src={story.image} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}
               onError={() => setImgErr(true)} />
           : <div style={{ width:"100%", height:"100%",
-              background:`linear-gradient(135deg,#2D1200,#0A0A0C)`,
+              background:"linear-gradient(135deg,#2D1200,#0A0A0C)",
               display:"flex", alignItems:"center", justifyContent:"center", fontSize:80 }}>🏎</div>
         }
 
-        {/* Dark gradient overlays */}
+        {/* Gradient overlays */}
         <div style={{ position:"absolute", inset:0,
-          background:"linear-gradient(to bottom, rgba(0,0,0,.5) 0%, transparent 25%, transparent 65%, rgba(0,0,0,.8) 100%)" }} />
+          background:"linear-gradient(to bottom, rgba(0,0,0,.55) 0%, transparent 28%, transparent 62%, rgba(0,0,0,.85) 100%)",
+          pointerEvents:"none" }} />
 
-        {/* Tap zones */}
-        <div style={{ position:"absolute", inset:0, display:"flex" }}>
+        {/* Tap zones (mouse/desktop) */}
+        <div style={{ position:"absolute", inset:0, display:"flex", pointerEvents:"auto" }}>
           <div style={{ width:"35%", height:"100%" }} onClick={goPrev} />
-          <div style={{ width:"65%", height:"100%" }} onClick={goNext} />
+          <div style={{ width:"30%", height:"100%" }} /> {/* centre - no tap */}
+          <div style={{ width:"35%", height:"100%" }} onClick={goNext} />
         </div>
 
         {/* Header */}
         <div style={{ position:"absolute", top:24, left:0, right:0, padding:"0 14px",
-          display:"flex", alignItems:"center", gap:10 }}>
+          display:"flex", alignItems:"center", gap:10, pointerEvents:"auto" }}>
           <Avatar initials={story.initials} src={story.avatar_url} size={38} ring />
           <div style={{ flex:1 }}>
             <div style={{ fontSize:14, fontWeight:700, color:"#fff" }}>@{story.handle}</div>
-            <div style={{ fontSize:11, color:"rgba(255,255,255,.7)" }}>{timeLeft(story.expiresAt)}</div>
+            <div style={{ fontSize:11, color:"rgba(255,255,255,.65)" }}>{timeLeft(story.expiresAt)}</div>
           </div>
+          {/* Story selector tray toggle */}
+          <button onClick={() => { setPaused(true); setShowTray(t => !t); }}
+            title="Browse all stories"
+            style={{ background:"rgba(255,255,255,.15)", border:"1px solid rgba(255,255,255,.2)",
+              borderRadius:20, padding:"5px 10px", color:"#fff", fontSize:11,
+              fontWeight:700, cursor:"pointer", backdropFilter:"blur(6px)" }}>
+            {idx+1}/{stories.length}
+          </button>
           <button onClick={onClose}
             style={{ background:"none", border:"none", color:"rgba(255,255,255,.8)",
-              fontSize:24, cursor:"pointer", lineHeight:1 }}>×</button>
+              fontSize:26, cursor:"pointer", lineHeight:1, marginLeft:4 }}>×</button>
         </div>
 
-        {/* Car info overlay */}
-        <div style={{ position:"absolute", bottom:80, left:14, right:14 }}>
+        {/* Swipe hint arrows */}
+        {dragOffset < -20 && idx < stories.length - 1 && (
+          <div style={{ position:"absolute", right:14, top:"50%", transform:"translateY(-50%)",
+            color:"rgba(255,255,255,.6)", fontSize:28, pointerEvents:"none" }}>›</div>
+        )}
+        {dragOffset > 20 && idx > 0 && (
+          <div style={{ position:"absolute", left:14, top:"50%", transform:"translateY(-50%)",
+            color:"rgba(255,255,255,.6)", fontSize:28, pointerEvents:"none" }}>‹</div>
+        )}
+
+        {/* Car info */}
+        <div style={{ position:"absolute", bottom:90, left:14, right:14, pointerEvents:"none" }}>
           <div style={{ marginBottom:8 }}>
-            <span style={{ background: `${RARITY_COLOR[story.rarity] || "#60a5fa"}22`,
-              color: RARITY_COLOR[story.rarity] || "#60a5fa",
-              border:`1px solid ${RARITY_COLOR[story.rarity] || "#60a5fa"}`,
+            <span style={{ background:`${RARITY_COLOR[story.rarity]||"#60a5fa"}22`,
+              color:RARITY_COLOR[story.rarity]||"#60a5fa",
+              border:`1px solid ${RARITY_COLOR[story.rarity]||"#60a5fa"}`,
               borderRadius:6, padding:"3px 10px", fontSize:10, fontWeight:700,
               textTransform:"uppercase", letterSpacing:".06em" }}>
               {story.rarity}
@@ -1338,27 +1380,83 @@ function StoryViewer({ stories, initialIndex, onClose, onViewed }) {
             {story.make} {story.model}
           </div>
           {story.location && (
-            <div style={{ fontSize:12, color:"rgba(255,255,255,.8)",
-              display:"flex", alignItems:"center", gap:5 }}>
+            <div style={{ fontSize:12, color:"rgba(255,255,255,.8)" }}>
               📍 {story.location}
             </div>
           )}
         </div>
       </div>
 
+      {/* Story selector tray */}
+      {showTray && (
+        <div style={{ position:"absolute", bottom:80, left:0, right:0, zIndex:20,
+          background:"rgba(10,10,12,.92)", backdropFilter:"blur(16px)",
+          borderTop:"1px solid rgba(255,255,255,.1)", padding:"14px 14px 16px" }}>
+          <div style={{ fontSize:11, color:"rgba(255,255,255,.5)", fontWeight:700,
+            textTransform:"uppercase", letterSpacing:".08em", marginBottom:12 }}>
+            All Stories — tap to jump
+          </div>
+          <div style={{ display:"flex", gap:10, overflowX:"auto",
+            scrollbarWidth:"none", paddingBottom:4 }}>
+            {stories.map((s, i) => (
+              <div key={s.id} onClick={() => { setShowTray(false); setPaused(false); goTo(i); }}
+                style={{ flexShrink:0, display:"flex", flexDirection:"column",
+                  alignItems:"center", gap:6, cursor:"pointer" }}>
+                {/* Thumbnail */}
+                <div style={{ width:56, height:80, borderRadius:10, overflow:"hidden",
+                  border:`2px solid ${i===idx?"#E8430A":"rgba(255,255,255,.15)"}`,
+                  position:"relative", flexShrink:0 }}>
+                  {s.image
+                    ? <img src={s.image} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                    : <div style={{ width:"100%", height:"100%", background:"#2D1200",
+                        display:"flex", alignItems:"center", justifyContent:"center", fontSize:22 }}>🏎</div>
+                  }
+                  {/* Viewed overlay */}
+                  {s.viewed && i !== idx && (
+                    <div style={{ position:"absolute", inset:0,
+                      background:"rgba(0,0,0,.5)" }} />
+                  )}
+                  {/* Currently playing indicator */}
+                  {i === idx && (
+                    <div style={{ position:"absolute", bottom:4, left:"50%",
+                      transform:"translateX(-50%)", width:16, height:3,
+                      borderRadius:2, background:"#E8430A" }} />
+                  )}
+                </div>
+                {/* Make */}
+                <div style={{ fontSize:9, color: i===idx?"#E8430A":"rgba(255,255,255,.5)",
+                  fontWeight:700, maxWidth:56, overflow:"hidden",
+                  textOverflow:"ellipsis", whiteSpace:"nowrap", textAlign:"center" }}>
+                  {s.make}
+                </div>
+                {/* Handle */}
+                <div style={{ fontSize:9, color:"rgba(255,255,255,.4)",
+                  maxWidth:56, overflow:"hidden",
+                  textOverflow:"ellipsis", whiteSpace:"nowrap", textAlign:"center" }}>
+                  @{s.handle}
+                </div>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => { setShowTray(false); setPaused(false); }}
+            style={{ marginTop:12, width:"100%", padding:"9px", background:"rgba(255,255,255,.08)",
+              border:"1px solid rgba(255,255,255,.1)", borderRadius:10,
+              color:"rgba(255,255,255,.6)", fontSize:13, fontWeight:600, cursor:"pointer" }}>
+            Close
+          </button>
+        </div>
+      )}
+
       {/* Reply input */}
-      <div style={{ padding:"10px 14px 24px", background:"rgba(0,0,0,.6)",
-        backdropFilter:"blur(10px)" }}>
+      <div style={{ flexShrink:0, padding:"10px 14px 28px",
+        background:"rgba(0,0,0,.6)", backdropFilter:"blur(10px)" }}>
         <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-          <input
-            value={reply}
-            onChange={e => setReply(e.target.value)}
-            onFocus={() => setPaused(true)}
-            onBlur={() => setPaused(false)}
+          <input value={reply} onChange={e => setReply(e.target.value)}
+            onFocus={() => setPaused(true)} onBlur={() => { if (!showTray) setPaused(false); }}
             placeholder={`Reply to @${story.handle}…`}
-            style={{ flex:1, background:"rgba(255,255,255,.1)", border:"1px solid rgba(255,255,255,.2)",
-              borderRadius:22, padding:"9px 14px", color:"#fff", fontSize:13,
-              outline:"none" }} />
+            style={{ flex:1, background:"rgba(255,255,255,.1)",
+              border:"1px solid rgba(255,255,255,.2)", borderRadius:22,
+              padding:"9px 14px", color:"#fff", fontSize:13, outline:"none" }} />
           <button style={{ background:"none", border:"none", fontSize:22, cursor:"pointer" }}>❤️</button>
           {reply.trim() && (
             <button onClick={() => setReply("")}
