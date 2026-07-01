@@ -1080,11 +1080,457 @@ function EditProfileSheet({ onClose }) {
   );
 }
 
+// ─── STORIES ──────────────────────────────────────────────────
+const MOCK_STORIES = [
+  { id:"st1", handle:"jdm_tokyo",    initials:"KT", image:"https://images.unsplash.com/photo-1525609004556-c46c7d6cf023?w=600&q=80", make:"Bugatti",     model:"Chiron SS",    rarity:"Hypercar", location:"Shibuya, Tokyo",       viewed:false, expiresAt: Date.now() + 18*3600000 },
+  { id:"st2", handle:"euro_spotter", initials:"LM", image:"https://images.unsplash.com/photo-1583121274602-3e2820c69888?w=600&q=80", make:"Ferrari",      model:"SF90",         rarity:"Hypercar", location:"Monaco",               viewed:false, expiresAt: Date.now() + 12*3600000 },
+  { id:"st3", handle:"apex_hunter",  initials:"AH", image:"https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=600&q=80",  make:"Lamborghini",  model:"Huracán STO",  rarity:"Exotic",   location:"Beverly Hills",        viewed:true,  expiresAt: Date.now() + 6*3600000  },
+  { id:"st4", handle:"gulf_spots",   initials:"OR", image:"https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=600&q=80",  make:"McLaren",      model:"765LT",        rarity:"Exotic",   location:"Dubai Marina",         viewed:false, expiresAt: Date.now() + 20*3600000 },
+  { id:"st5", handle:"la_spotter",   initials:"MW", image:"https://images.unsplash.com/photo-1493238792000-8113da705763?w=600&q=80",make:"Porsche",      model:"GT3 RS",       rarity:"Sports",   location:"Santa Monica",         viewed:true,  expiresAt: Date.now() + 3*3600000  },
+];
+
+function StoriesRow({ profile, onAddStory }) {
+  const [stories, setStories] = useState([]);
+  const [viewing, setViewing] = useState(null); // index into stories
+
+  useEffect(() => {
+    // Load from Supabase, fall back to mock
+    const load = async () => {
+      const { data } = await supabase
+        .from("stories")
+        .select("*, profiles(handle, avatar_url)")
+        .gt("expires_at", new Date().toISOString())
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (data && data.length > 0) {
+        setStories(data.map(s => ({
+          id:        s.id,
+          handle:    s.profiles?.handle || "spotter",
+          initials:  (s.profiles?.handle || "SP").slice(0,2).toUpperCase(),
+          avatar_url:s.profiles?.avatar_url,
+          image:     s.image_url,
+          make:      s.make,
+          model:     s.model,
+          rarity:    s.rarity || "Sports",
+          location:  s.location_name || "",
+          viewed:    false,
+          expiresAt: new Date(s.expires_at).getTime(),
+        })));
+      } else {
+        setStories(MOCK_STORIES);
+      }
+    };
+    load();
+  }, []);
+
+  const openStory = (idx) => {
+    setViewing(idx);
+    setStories(ss => ss.map((s, i) => i === idx ? { ...s, viewed: true } : s));
+  };
+
+  const timeLeft = (expiresAt) => {
+    const h = Math.floor((expiresAt - Date.now()) / 3600000);
+    if (h < 1) return "<1h";
+    if (h < 24) return `${h}h`;
+    return "24h";
+  };
+
+  return (
+    <>
+      <div style={{ display:"flex", gap:12, overflowX:"auto", padding:"12px 14px",
+        borderBottom:"1px solid #252530",
+        scrollbarWidth:"none", msOverflowStyle:"none" }}>
+
+        {/* Your story / Add */}
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"center",
+          gap:5, flexShrink:0, cursor:"pointer" }}
+          onClick={onAddStory}>
+          <div style={{ position:"relative" }}>
+            <div style={{ width:60, height:60, borderRadius:"50%",
+              background:"linear-gradient(135deg,#252530,#18181F)",
+              border:"2px dashed #252530",
+              display:"flex", alignItems:"center", justifyContent:"center" }}>
+              {profile?.avatar_url
+                ? <img src={profile.avatar_url} alt="" style={{ width:"100%", height:"100%", borderRadius:"50%", objectFit:"cover" }} />
+                : <Avatar initials={profile?.handle?.slice(0,2).toUpperCase()||"ME"} size={56} />
+              }
+            </div>
+            <div style={{ position:"absolute", bottom:0, right:0, width:20, height:20,
+              borderRadius:"50%", background:"#E8430A", border:"2px solid #0A0A0C",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              fontSize:14, fontWeight:700, color:"#fff", lineHeight:1 }}>
+              +
+            </div>
+          </div>
+          <span style={{ fontSize:10, color:"#6B6878", fontWeight:600,
+            textAlign:"center", maxWidth:64, overflow:"hidden",
+            textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+            Your Story
+          </span>
+        </div>
+
+        {/* Other stories */}
+        {stories.map((s, i) => (
+          <div key={s.id} style={{ display:"flex", flexDirection:"column",
+            alignItems:"center", gap:5, flexShrink:0, cursor:"pointer" }}
+            onClick={() => openStory(i)}>
+            <div style={{ width:60, height:60, borderRadius:"50%", padding:2,
+              background: s.viewed
+                ? "#252530"
+                : "linear-gradient(135deg,#E8430A,#C9A84C)",
+              flexShrink:0 }}>
+              <div style={{ width:"100%", height:"100%", borderRadius:"50%",
+                overflow:"hidden", border:"2px solid #0A0A0C" }}>
+                {s.image
+                  ? <img src={s.image} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                  : <div style={{ width:"100%", height:"100%",
+                      background:"linear-gradient(135deg,#2D1200,#1C1C24)",
+                      display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>🏎</div>
+                }
+              </div>
+            </div>
+            <span style={{ fontSize:10, fontWeight:600, textAlign:"center",
+              maxWidth:64, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
+              color: s.viewed ? "#6B6878" : "#F2EEE8" }}>
+              @{s.handle}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Story viewer */}
+      {viewing !== null && (
+        <StoryViewer
+          stories={stories}
+          initialIndex={viewing}
+          onClose={() => setViewing(null)}
+          onViewed={(idx) => setStories(ss => ss.map((s, i) => i===idx ? {...s, viewed:true} : s))}
+        />
+      )}
+    </>
+  );
+}
+
+function StoryViewer({ stories, initialIndex, onClose, onViewed }) {
+  const { profile } = useAuth();
+  const [idx,      setIdx]      = useState(initialIndex);
+  const [progress, setProgress] = useState(0);
+  const [paused,   setPaused]   = useState(false);
+  const [imgErr,   setImgErr]   = useState(false);
+  const [reply,    setReply]    = useState("");
+  const intervalRef = useRef(null);
+  const DURATION = 5000; // 5 seconds per story
+
+  const story = stories[idx];
+
+  const goNext = useCallback(() => {
+    if (idx < stories.length - 1) {
+      setIdx(i => i + 1);
+      setProgress(0);
+      setImgErr(false);
+    } else {
+      onClose();
+    }
+  }, [idx, stories.length, onClose]);
+
+  const goPrev = () => {
+    if (idx > 0) {
+      setIdx(i => i - 1);
+      setProgress(0);
+      setImgErr(false);
+    }
+  };
+
+  useEffect(() => {
+    onViewed(idx);
+    setProgress(0);
+  }, [idx]);
+
+  useEffect(() => {
+    if (paused) return;
+    intervalRef.current = setInterval(() => {
+      setProgress(p => {
+        if (p >= 100) { goNext(); return 0; }
+        return p + (100 / (DURATION / 50));
+      });
+    }, 50);
+    return () => clearInterval(intervalRef.current);
+  }, [idx, paused, goNext]);
+
+  const timeLeft = (expiresAt) => {
+    const h = Math.floor((expiresAt - Date.now()) / 3600000);
+    if (h < 1) return "Expires soon";
+    return `${h}h left`;
+  };
+
+  const RARITY_COLOR = { Hypercar:"#b388ff", Exotic:"#E8430A", Sports:"#60a5fa" };
+
+  if (!story) return null;
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"#000", zIndex:900,
+      display:"flex", flexDirection:"column", maxWidth:430,
+      margin:"0 auto", touchAction:"none" }}>
+
+      {/* Progress bars */}
+      <div style={{ position:"absolute", top:0, left:0, right:0, zIndex:10,
+        display:"flex", gap:3, padding:"10px 10px 0" }}>
+        {stories.map((_, i) => (
+          <div key={i} style={{ flex:1, height:2, background:"rgba(255,255,255,.3)",
+            borderRadius:1, overflow:"hidden" }}>
+            <div style={{ height:"100%", background:"#fff", borderRadius:1,
+              width: i < idx ? "100%" : i === idx ? `${progress}%` : "0%",
+              transition: i === idx ? "none" : "none" }} />
+          </div>
+        ))}
+      </div>
+
+      {/* Story image */}
+      <div style={{ flex:1, position:"relative", overflow:"hidden" }}
+        onPointerDown={() => setPaused(true)}
+        onPointerUp={() => setPaused(false)}>
+        {story.image && !imgErr
+          ? <img src={story.image} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}
+              onError={() => setImgErr(true)} />
+          : <div style={{ width:"100%", height:"100%",
+              background:`linear-gradient(135deg,#2D1200,#0A0A0C)`,
+              display:"flex", alignItems:"center", justifyContent:"center", fontSize:80 }}>🏎</div>
+        }
+
+        {/* Dark gradient overlays */}
+        <div style={{ position:"absolute", inset:0,
+          background:"linear-gradient(to bottom, rgba(0,0,0,.5) 0%, transparent 25%, transparent 65%, rgba(0,0,0,.8) 100%)" }} />
+
+        {/* Tap zones */}
+        <div style={{ position:"absolute", inset:0, display:"flex" }}>
+          <div style={{ width:"35%", height:"100%" }} onClick={goPrev} />
+          <div style={{ width:"65%", height:"100%" }} onClick={goNext} />
+        </div>
+
+        {/* Header */}
+        <div style={{ position:"absolute", top:24, left:0, right:0, padding:"0 14px",
+          display:"flex", alignItems:"center", gap:10 }}>
+          <Avatar initials={story.initials} src={story.avatar_url} size={38} ring />
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:14, fontWeight:700, color:"#fff" }}>@{story.handle}</div>
+            <div style={{ fontSize:11, color:"rgba(255,255,255,.7)" }}>{timeLeft(story.expiresAt)}</div>
+          </div>
+          <button onClick={onClose}
+            style={{ background:"none", border:"none", color:"rgba(255,255,255,.8)",
+              fontSize:24, cursor:"pointer", lineHeight:1 }}>×</button>
+        </div>
+
+        {/* Car info overlay */}
+        <div style={{ position:"absolute", bottom:80, left:14, right:14 }}>
+          <div style={{ marginBottom:8 }}>
+            <span style={{ background: `${RARITY_COLOR[story.rarity] || "#60a5fa"}22`,
+              color: RARITY_COLOR[story.rarity] || "#60a5fa",
+              border:`1px solid ${RARITY_COLOR[story.rarity] || "#60a5fa"}`,
+              borderRadius:6, padding:"3px 10px", fontSize:10, fontWeight:700,
+              textTransform:"uppercase", letterSpacing:".06em" }}>
+              {story.rarity}
+            </span>
+          </div>
+          <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:32,
+            fontWeight:900, color:"#fff", lineHeight:1, marginBottom:6,
+            textShadow:"0 2px 12px rgba(0,0,0,.8)" }}>
+            {story.make} {story.model}
+          </div>
+          {story.location && (
+            <div style={{ fontSize:12, color:"rgba(255,255,255,.8)",
+              display:"flex", alignItems:"center", gap:5 }}>
+              📍 {story.location}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Reply input */}
+      <div style={{ padding:"10px 14px 24px", background:"rgba(0,0,0,.6)",
+        backdropFilter:"blur(10px)" }}>
+        <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+          <input
+            value={reply}
+            onChange={e => setReply(e.target.value)}
+            onFocus={() => setPaused(true)}
+            onBlur={() => setPaused(false)}
+            placeholder={`Reply to @${story.handle}…`}
+            style={{ flex:1, background:"rgba(255,255,255,.1)", border:"1px solid rgba(255,255,255,.2)",
+              borderRadius:22, padding:"9px 14px", color:"#fff", fontSize:13,
+              outline:"none" }} />
+          <button style={{ background:"none", border:"none", fontSize:22, cursor:"pointer" }}>❤️</button>
+          {reply.trim() && (
+            <button onClick={() => setReply("")}
+              style={{ background:"#E8430A", border:"none", borderRadius:99,
+                padding:"7px 14px", color:"#fff", fontSize:12, fontWeight:700, cursor:"pointer" }}>
+              Send
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StoryUploadModal({ onClose }) {
+  const { user, profile } = useAuth();
+  const [file,    setFile]    = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [form,    setForm]    = useState({ make:"", model:"", rarity:"Exotic", location:"" });
+  const [posting, setPosting] = useState(false);
+  const [done,    setDone]    = useState(false);
+  const [error,   setError]   = useState("");
+  const fileRef = useRef();
+  const blobRef = useRef(null);
+  useEffect(() => () => { if (blobRef.current) URL.revokeObjectURL(blobRef.current); }, []);
+
+  const handleFile = (f) => {
+    if (!f || !f.type.startsWith("image/")) { setError("Please pick an image."); return; }
+    if (blobRef.current) URL.revokeObjectURL(blobRef.current);
+    blobRef.current = URL.createObjectURL(f);
+    setFile(f); setPreview(blobRef.current); setError("");
+  };
+
+  const post = async () => {
+    if (!file || !form.make) { setError("Pick a photo and enter the car make."); return; }
+    setPosting(true);
+    try {
+      const ext  = file.name.split(".").pop();
+      const path = `stories/${user.id}/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("spot-photos").upload(path, file, { contentType:file.type });
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from("spot-photos").getPublicUrl(path);
+
+      const expiresAt = new Date(Date.now() + 24*3600000).toISOString();
+      const { error: insErr } = await supabase.from("stories").insert({
+        user_id:      user.id,
+        image_url:    publicUrl,
+        make:         form.make,
+        model:        form.model,
+        rarity:       form.rarity,
+        location_name:form.location,
+        expires_at:   expiresAt,
+      });
+      if (insErr) throw insErr;
+      setDone(true);
+      setTimeout(onClose, 1800);
+    } catch(err) { setError(err.message); }
+    finally { setPosting(false); }
+  };
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.88)", zIndex:700,
+      backdropFilter:"blur(8px)", display:"flex", alignItems:"flex-end", justifyContent:"center" }}
+      onClick={e => { if (e.target===e.currentTarget) onClose(); }}>
+      <div style={{ background:"#14141A", width:"100%", maxWidth:480,
+        borderRadius:"20px 20px 0 0", border:"1px solid #252530",
+        animation:"slideUp .25s ease" }}>
+        <div style={{ padding:"16px 18px 12px", borderBottom:"1px solid #252530",
+          display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <span style={{ fontSize:16, fontWeight:800, color:"#F2EEE8" }}>
+            {done ? "Story Posted! 🔥" : "Add to Your Story"}
+          </span>
+          <button onClick={onClose} style={{ color:"#6B6878", fontSize:22, background:"none", border:"none" }}>×</button>
+        </div>
+        <div style={{ padding:18, paddingBottom:32 }}>
+          {done ? (
+            <div style={{ textAlign:"center", padding:"32px 0" }}>
+              <div style={{ fontSize:52, marginBottom:12 }}>🏎</div>
+              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:22, fontWeight:900, color:"#F2EEE8" }}>
+                Live for 24 hours!
+              </div>
+              <div style={{ fontSize:13, color:"#6B6878", marginTop:6 }}>Your spotters can see it now.</div>
+            </div>
+          ) : (
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              {/* Photo picker */}
+              {!preview ? (
+                <div onClick={() => fileRef.current?.click()}
+                  style={{ border:"2px dashed #252530", borderRadius:14, padding:"36px",
+                    textAlign:"center", cursor:"pointer", background:"#0A0A0C" }}
+                  onDragOver={e=>e.preventDefault()}
+                  onDrop={e=>{e.preventDefault();handleFile(e.dataTransfer.files[0]);}}>
+                  <div style={{ fontSize:32, marginBottom:8 }}>📸</div>
+                  <div style={{ fontSize:14, fontWeight:700, color:"#F2EEE8", marginBottom:4 }}>
+                    Pick a photo for your story
+                  </div>
+                  <div style={{ fontSize:12, color:"#6B6878" }}>Disappears in 24 hours</div>
+                  <input ref={fileRef} type="file" accept="image/*" style={{ display:"none" }}
+                    onChange={e=>handleFile(e.target.files?.[0])} />
+                </div>
+              ) : (
+                <div style={{ position:"relative" }}>
+                  <img src={preview} alt="" style={{ width:"100%", height:200, objectFit:"cover", borderRadius:12 }} />
+                  <button onClick={() => { setFile(null); setPreview(null); }}
+                    style={{ position:"absolute", top:8, right:8, background:"rgba(0,0,0,.6)",
+                      border:"none", borderRadius:"50%", width:28, height:28,
+                      color:"#fff", fontSize:16, cursor:"pointer",
+                      display:"flex", alignItems:"center", justifyContent:"center" }}>×</button>
+                </div>
+              )}
+
+              {/* Fields */}
+              {[
+                { key:"make",     label:"Make",     ph:"Ferrari"  },
+                { key:"model",    label:"Model",    ph:"SF90"     },
+                { key:"location", label:"Location", ph:"Monaco"   },
+              ].map(({ key, label, ph }) => (
+                <div key={key}>
+                  <label style={{ fontSize:11, color:"#6B6878", fontWeight:600,
+                    textTransform:"uppercase", letterSpacing:".05em", display:"block", marginBottom:5 }}>
+                    {label}
+                  </label>
+                  <input className="sd-input" placeholder={ph} value={form[key]}
+                    onChange={e => setForm(p => ({ ...p, [key]:e.target.value }))} />
+                </div>
+              ))}
+
+              {/* Rarity */}
+              <div>
+                <label style={{ fontSize:11, color:"#6B6878", fontWeight:600,
+                  textTransform:"uppercase", letterSpacing:".05em", display:"block", marginBottom:5 }}>
+                  Rarity
+                </label>
+                <div style={{ display:"flex", gap:8 }}>
+                  {["Sports","Exotic","Hypercar"].map(r => {
+                    const rc = RARITY[r]; const active = form.rarity===r;
+                    return (
+                      <button key={r} onClick={() => setForm(p=>({...p,rarity:r}))}
+                        style={{ flex:1, padding:"8px", borderRadius:9, fontSize:12, fontWeight:700,
+                          background:active?rc.bg:"#0A0A0C", border:`1px solid ${active?rc.border:"#252530"}`,
+                          color:active?rc.text:"#6B6878", cursor:"pointer" }}>{r}</button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <ErrorMsg msg={error} />
+
+              <button onClick={post} disabled={posting || !file}
+                style={{ width:"100%", padding:13, borderRadius:12,
+                  background:"linear-gradient(135deg,#E8430A,#BF360C)",
+                  border:"none", color:"#fff", fontSize:15, fontWeight:700,
+                  cursor: posting||!file ? "not-allowed" : "pointer",
+                  opacity: posting||!file ? 0.6 : 1,
+                  display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+                {posting ? <><Spinner size={16} color="#fff" /> Posting…</> : "Share Story →"}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── SCREENS ──────────────────────────────────────────────────
 function FeedScreen({ onSpotTap }) {
   const { profile } = useAuth();
-  const [spots,   setSpots]   = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [spots,      setSpots]      = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [showStoryUpload, setShowStoryUpload] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -1114,21 +1560,19 @@ function FeedScreen({ onSpotTap }) {
 
   return (
     <div>
-      {profile && (
-        <div style={{ padding:"14px 16px", borderBottom:"1px solid #252530", display:"flex", alignItems:"center", gap:10 }}>
-          <Avatar initials={profile.handle?.slice(0,2).toUpperCase()} src={profile.avatar_url} size={36} ring />
-          <div>
-            <div style={{ fontSize:13, fontWeight:700, color:"#F2EEE8" }}>Welcome back, @{profile.handle} 👋</div>
-            <div style={{ fontSize:11, color:"#6B6878" }}>What will you spot today?</div>
-          </div>
-        </div>
-      )}
-      <div style={{ margin:"12px 14px", padding:"10px 14px", background:"#2D1200",
-        border:"1px solid rgba(232,67,10,.3)", borderRadius:12, display:"flex", alignItems:"center", gap:8, fontSize:13 }}>
+      {/* Stories row */}
+      <StoriesRow profile={profile} onAddStory={() => setShowStoryUpload(true)} />
+
+      {/* Trending banner */}
+      <div style={{ margin:"10px 14px", padding:"10px 14px", background:"#2D1200",
+        border:"1px solid rgba(232,67,10,.3)", borderRadius:12,
+        display:"flex", alignItems:"center", gap:8, fontSize:13 }}>
         <span>🔥</span>
         <span style={{ color:"#F2EEE8", fontWeight:600 }}>Trending: </span>
         <span style={{ color:"#6B6878" }}>Bugatti Chiron SS in Tokyo · 9.4k likes</span>
       </div>
+
+      {/* Feed cards */}
       <div style={{ display:"flex", flexDirection:"column", gap:14, padding:"0 14px 14px" }}>
         {loading
           ? Array(3).fill(0).map((_,i) => (
@@ -1149,6 +1593,8 @@ function FeedScreen({ onSpotTap }) {
           : spots.map(s => <SpotCard key={s.id} spot={s} onTap={onSpotTap} />)
         }
       </div>
+
+      {showStoryUpload && <StoryUploadModal onClose={() => setShowStoryUpload(false)} />}
     </div>
   );
 }
