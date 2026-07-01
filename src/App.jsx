@@ -1079,8 +1079,216 @@ function ProfileScreen() {
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────
+// ─── NOTIFICATIONS SCREEN ────────────────────────────────────
+function NotificationsScreen() {
+  const { user, profile } = useAuth();
+  const [notifs,   setNotifs]   = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [filter,   setFilter]   = useState("all"); // all | unread | likes | follows
+
+  useEffect(() => {
+    if (!user) return;
+    // Load from Supabase if table exists, otherwise use mock data
+    const load = async () => {
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (data && data.length > 0) {
+        setNotifs(data);
+      } else {
+        // Rich mock notifications
+        setNotifs([
+          { id:"n1", type:"like",    read:false, created_at: new Date(Date.now()-2*60000).toISOString(),
+            actor_handle:"euro_spotter", actor_initials:"LM",
+            text:"liked your Lamborghini Huracán STO spot", spot_make:"Lamborghini", spot_model:"Huracán STO" },
+          { id:"n2", type:"follow",  read:false, created_at: new Date(Date.now()-15*60000).toISOString(),
+            actor_handle:"jdm_tokyo", actor_initials:"KT",
+            text:"started following you", spot_make:null },
+          { id:"n3", type:"comment", read:false, created_at: new Date(Date.now()-45*60000).toISOString(),
+            actor_handle:"gulf_spots", actor_initials:"OR",
+            text:"commented on your spot: \"Absolute legend catch 🔥\"", spot_make:"Lamborghini", spot_model:"Huracán STO" },
+          { id:"n4", type:"like",    read:true,  created_at: new Date(Date.now()-2*3600000).toISOString(),
+            actor_handle:"la_spotter", actor_initials:"MW",
+            text:"liked your Ferrari SF90 spot", spot_make:"Ferrari", spot_model:"SF90" },
+          { id:"n5", type:"save",    read:true,  created_at: new Date(Date.now()-3*3600000).toISOString(),
+            actor_handle:"apex_hunter", actor_initials:"AH",
+            text:"saved your Bugatti Chiron spot", spot_make:"Bugatti", spot_model:"Chiron" },
+          { id:"n6", type:"follow",  read:true,  created_at: new Date(Date.now()-5*3600000).toISOString(),
+            actor_handle:"nring_nut", actor_initials:"HF",
+            text:"started following you", spot_make:null },
+          { id:"n7", type:"like",    read:true,  created_at: new Date(Date.now()-24*3600000).toISOString(),
+            actor_handle:"euro_spotter", actor_initials:"LM",
+            text:"liked your McLaren P1 spot", spot_make:"McLaren", spot_model:"P1" },
+          { id:"n8", type:"comment", read:true,  created_at: new Date(Date.now()-2*24*3600000).toISOString(),
+            actor_handle:"jdm_tokyo", actor_initials:"KT",
+            text:"commented: \"Never seen one in person, incredible\"", spot_make:"Pagani", spot_model:"Huayra" },
+        ]);
+      }
+      setLoading(false);
+    };
+    load();
+  }, [user]);
+
+  const timeAgo = (ts) => {
+    const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
+    if (m < 1)    return "just now";
+    if (m < 60)   return `${m}m`;
+    if (m < 1440) return `${Math.floor(m/60)}h`;
+    return `${Math.floor(m/1440)}d`;
+  };
+
+  const markAllRead = () => setNotifs(ns => ns.map(n => ({ ...n, read:true })));
+  const markRead    = (id) => setNotifs(ns => ns.map(n => n.id===id ? {...n, read:true} : n));
+
+  const TYPE_CONFIG = {
+    like:    { icon:"❤️", color:"#E8430A", label:"Likes"    },
+    follow:  { icon:"👤", color:"#3B82F6", label:"Follows"  },
+    comment: { icon:"💬", color:"#9B59B6", label:"Comments" },
+    save:    { icon:"🔖", color:"#C9A84C", label:"Saves"    },
+    mention: { icon:"@",  color:"#22C55E", label:"Mentions" },
+  };
+
+  const filtered = notifs.filter(n => {
+    if (filter === "unread")   return !n.read;
+    if (filter === "likes")    return n.type === "like";
+    if (filter === "follows")  return n.type === "follow";
+    if (filter === "comments") return n.type === "comment";
+    return true;
+  });
+
+  const unreadCount = notifs.filter(n => !n.read).length;
+
+  return (
+    <div>
+      {/* Header row */}
+      <div style={{ padding:"16px 16px 12px", borderBottom:"1px solid #252530",
+        display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:20, fontWeight:900, color:"#F2EEE8" }}>
+            Notifications
+          </div>
+          {unreadCount > 0 && (
+            <div style={{ background:"#E8430A", borderRadius:99, padding:"2px 8px",
+              fontSize:11, fontWeight:700, color:"#fff" }}>
+              {unreadCount}
+            </div>
+          )}
+        </div>
+        {unreadCount > 0 && (
+          <button onClick={markAllRead}
+            style={{ fontSize:12, color:"#E8430A", fontWeight:700, background:"none", border:"none", cursor:"pointer" }}>
+            Mark all read
+          </button>
+        )}
+      </div>
+
+      {/* Filter tabs */}
+      <div style={{ display:"flex", gap:0, borderBottom:"1px solid #252530", overflowX:"auto" }}>
+        {[
+          { key:"all",      label:"All"      },
+          { key:"unread",   label:"Unread"   },
+          { key:"likes",    label:"Likes"    },
+          { key:"follows",  label:"Follows"  },
+          { key:"comments", label:"Comments" },
+        ].map(f => (
+          <button key={f.key} onClick={() => setFilter(f.key)}
+            style={{ padding:"10px 14px", fontSize:12, fontWeight:600, whiteSpace:"nowrap",
+              background:"none", border:"none", cursor:"pointer",
+              color: filter===f.key ? "#E8430A" : "#6B6878",
+              borderBottom: filter===f.key ? "2px solid #E8430A" : "2px solid transparent" }}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {/* List */}
+      <div style={{ padding:"8px 14px" }}>
+        {loading ? (
+          Array(5).fill(0).map((_,i) => (
+            <div key={i} style={{ display:"flex", gap:10, padding:"12px 0",
+              borderBottom:"1px solid #252530" }}>
+              <div className="shimmer" style={{ width:44, height:44, borderRadius:"50%", flexShrink:0 }} />
+              <div style={{ flex:1, display:"flex", flexDirection:"column", gap:6 }}>
+                <div className="shimmer" style={{ height:12, width:"70%" }} />
+                <div className="shimmer" style={{ height:11, width:"45%" }} />
+              </div>
+            </div>
+          ))
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign:"center", padding:"60px 0" }}>
+            <div style={{ fontSize:40, marginBottom:12 }}>🔔</div>
+            <div style={{ fontSize:16, fontWeight:700, color:"#F2EEE8", marginBottom:6 }}>
+              {filter === "unread" ? "All caught up!" : "No notifications yet"}
+            </div>
+            <div style={{ fontSize:13, color:"#6B6878" }}>
+              {filter === "unread" ? "You've read everything." : "Post a spot to start getting likes and follows."}
+            </div>
+          </div>
+        ) : (
+          filtered.map(n => {
+            const tc = TYPE_CONFIG[n.type] || TYPE_CONFIG.like;
+            return (
+              <div key={n.id} onClick={() => markRead(n.id)}
+                style={{ display:"flex", alignItems:"flex-start", gap:12,
+                  padding:"13px 0", borderBottom:"1px solid #252530",
+                  background: n.read ? "none" : "transparent",
+                  cursor:"pointer", position:"relative" }}>
+                {/* Unread dot */}
+                {!n.read && (
+                  <div style={{ position:"absolute", left:-8, top:"50%", transform:"translateY(-50%)",
+                    width:6, height:6, borderRadius:"50%", background:"#E8430A" }} />
+                )}
+                {/* Avatar with type badge */}
+                <div style={{ position:"relative", flexShrink:0 }}>
+                  <Avatar initials={n.actor_initials || "?"} size={44} />
+                  <div style={{ position:"absolute", bottom:-2, right:-2, width:20, height:20,
+                    borderRadius:"50%", background:tc.color,
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    fontSize:10, border:"2px solid #0A0A0C" }}>
+                    {tc.icon}
+                  </div>
+                </div>
+                {/* Content */}
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, color:"#F2EEE8", lineHeight:1.45, marginBottom:3 }}>
+                    <span style={{ fontWeight:700 }}>@{n.actor_handle}</span>
+                    {" "}<span style={{ color: n.read ? "#AAA6A0" : "#F2EEE8" }}>{n.text}</span>
+                  </div>
+                  <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                    <span style={{ fontSize:11, color:"#6B6878" }}>{timeAgo(n.created_at)}</span>
+                    {n.spot_make && (
+                      <>
+                        <span style={{ fontSize:11, color:"#3D3D4E" }}>·</span>
+                        <span style={{ fontSize:11, color:tc.color }}>{n.spot_make} {n.spot_model}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {/* Spot thumbnail placeholder */}
+                {n.spot_make && (
+                  <div style={{ width:44, height:44, borderRadius:8, flexShrink:0,
+                    background:"linear-gradient(135deg,#2D1200,#1C1C24)",
+                    display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>
+                    🏎
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MainApp() {
   const [screen,     setScreen]     = useState("feed");
+  const [showNotifs, setShowNotifs] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(3);
   const [spotDetail, setSpotDetail] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
 
@@ -1104,9 +1312,26 @@ function MainApp() {
             <div style={{ fontSize:9, color:"#E8430A", fontWeight:700, letterSpacing:".1em" }}>BETA</div>
           </div>
         </div>
-        <div style={{ fontSize:10, color:"#22C55E", fontWeight:700, display:"flex", alignItems:"center", gap:4 }}>
-          <div style={{ width:6, height:6, borderRadius:"50%", background:"#22C55E" }} />
-          LIVE
+        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+          {/* Bell icon with unread badge */}
+          <button onClick={() => { setShowNotifs(true); setUnreadCount(0); }}
+            style={{ position:"relative", background:"none", border:"none",
+              width:36, height:36, display:"flex", alignItems:"center",
+              justifyContent:"center", cursor:"pointer", borderRadius:"50%" }}>
+            <span style={{ fontSize:20 }}>🔔</span>
+            {unreadCount > 0 && (
+              <div style={{ position:"absolute", top:0, right:0, width:16, height:16,
+                borderRadius:"50%", background:"#E8430A", border:"2px solid #0A0A0C",
+                display:"flex", alignItems:"center", justifyContent:"center",
+                fontSize:8, fontWeight:800, color:"#fff" }}>
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </div>
+            )}
+          </button>
+          <div style={{ fontSize:10, color:"#22C55E", fontWeight:700, display:"flex", alignItems:"center", gap:4 }}>
+            <div style={{ width:6, height:6, borderRadius:"50%", background:"#22C55E" }} />
+            LIVE
+          </div>
         </div>
       </header>
 
@@ -1142,6 +1367,33 @@ function MainApp() {
       </nav>
 
       {showUpload && <UploadModal onClose={() => setShowUpload(false)} />}
+
+      {/* Notifications panel */}
+      {showNotifs && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.8)", zIndex:500,
+          backdropFilter:"blur(6px)", display:"flex", alignItems:"flex-end", justifyContent:"center" }}
+          onClick={e => { if (e.target===e.currentTarget) setShowNotifs(false); }}>
+          <div style={{ background:"#0A0A0C", width:"100%", maxWidth:430,
+            height:"88vh", borderRadius:"20px 20px 0 0",
+            border:"1px solid #252530", display:"flex", flexDirection:"column",
+            animation:"slideUp .25s ease" }}>
+            {/* Sheet header */}
+            <div style={{ padding:"14px 16px 0", flexShrink:0 }}>
+              <div style={{ width:36, height:4, borderRadius:2, background:"#252530", margin:"0 auto 14px" }} />
+            </div>
+            <div style={{ flex:1, overflowY:"auto" }}>
+              <NotificationsScreen />
+            </div>
+            <div style={{ padding:"12px 16px", borderTop:"1px solid #252530", flexShrink:0 }}>
+              <button onClick={() => setShowNotifs(false)}
+                style={{ width:"100%", padding:12, borderRadius:12, border:"1px solid #252530",
+                  background:"none", color:"#6B6878", fontSize:14, fontWeight:600, cursor:"pointer" }}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {spotDetail && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.85)", zIndex:500,
