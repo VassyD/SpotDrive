@@ -1997,6 +1997,53 @@ function MainApp() {
   );
 }
 
+// ─── COMMENT ROW ─────────────────────────────────────────────
+function CommentRow({ comment: c, user, profile, timeAgo, onReply }) {
+  const [liked, setLiked] = useState(false);
+  const [likes, setLikes] = useState(c.likes_count || 0);
+
+  const handleLike = () => {
+    const next = !liked;
+    setLiked(next);
+    setLikes(n => next ? n+1 : n-1);
+    if (!c.optimistic) {
+      supabase.from("comments")
+        .update({ likes_count: next ? likes+1 : likes-1 })
+        .eq("id", c.id).catch(console.error);
+    }
+  };
+
+  return (
+    <div style={{ display:"flex", gap:10, padding:"10px 16px",
+      opacity: c.optimistic ? 0.6 : 1, transition:"opacity .3s" }}>
+      <Avatar initials={c.initials} src={c.avatar_url} size={34} />
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ display:"flex", alignItems:"baseline", gap:6, marginBottom:3 }}>
+          <span style={{ fontSize:13, fontWeight:700, color:"#F2EEE8" }}>@{c.handle}</span>
+          <span style={{ fontSize:10, color:"#6B6878" }}>{timeAgo(c.created_at)}</span>
+          {c.optimistic && <span style={{ fontSize:10, color:"#6B6878" }}>sending…</span>}
+        </div>
+        <div style={{ fontSize:13, color:"#AAA6A0", lineHeight:1.5 }}>{c.text}</div>
+        <div style={{ display:"flex", alignItems:"center", gap:14, marginTop:6 }}>
+          <button onClick={handleLike}
+            style={{ display:"flex", alignItems:"center", gap:4, background:"none",
+              border:"none", cursor:"pointer", color: liked ? "#E8430A" : "#6B6878",
+              fontSize:12, fontWeight:600, transition:"color .15s" }}>
+            {liked ? "❤️" : "🤍"}{likes > 0 ? ` ${likes}` : ""}
+          </button>
+          {user && profile?.handle !== c.handle && (
+            <button onClick={() => onReply(c.handle)}
+              style={{ background:"none", border:"none", cursor:"pointer",
+                color:"#6B6878", fontSize:11, fontWeight:600 }}>
+              Reply
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── COMMENTS SHEET ───────────────────────────────────────────
 function CommentsSheet({ spot, onClose }) {
   const { user, profile } = useAuth();
@@ -2205,24 +2252,10 @@ function CommentsSheet({ spot, onClose }) {
               <div style={{ fontSize:12, color:"#6B6878" }}>Be the first to comment on this spot.</div>
             </div>
           ) : (
-            comments.map(c => (
-              <div key={c.id} style={{ display:"flex", gap:10, padding:"10px 16px",
-                opacity: c.optimistic ? 0.6 : 1, transition:"opacity .3s" }}>
-                <Avatar initials={c.initials} src={c.avatar_url} size={34} />
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ display:"flex", alignItems:"baseline", gap:6, marginBottom:3 }}>
-                    <span style={{ fontSize:13, fontWeight:700, color:"#F2EEE8" }}>@{c.handle}</span>
-                    <span style={{ fontSize:10, color:"#6B6878" }}>{timeAgo(c.created_at)}</span>
-                    {c.optimistic && <span style={{ fontSize:10, color:"#6B6878" }}>sending…</span>}
-                  </div>
-                  <div style={{ fontSize:13, color:"#AAA6A0", lineHeight:1.5 }}>{c.text}</div>
-                  {c.likes_count > 0 && (
-                    <div style={{ fontSize:11, color:"#6B6878", marginTop:4 }}>
-                      ❤️ {c.likes_count}
-                    </div>
-                  )}
-                </div>
-              </div>
+          comments.map(c => (
+              <CommentRow key={c.id} comment={c} user={user}
+                profile={profile} timeAgo={timeAgo}
+                onReply={(handle) => { setText(`@${handle} `); inputRef.current?.focus(); }} />
             ))
           )}
           <div ref={bottomRef} style={{ height:8 }} />
