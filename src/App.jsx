@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useRef, memo, createContext, useContext } from "react";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import React, { useState, useEffect, useCallback, useRef, memo, createContext, useContext } from "react";
+import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL  || "https://lhahofbryglxdxffxjbr.supabase.co";
+const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxoYWhvZmJyeWdseGR4ZmZ4amJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3MzA5ODgsImV4cCI6MjA5ODMwNjk4OH0.5rmKCnWqROlefWII7QpHsbY8xUMJytL6CoJ8LYsaUGQ";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
 
 const T = {
@@ -125,17 +125,17 @@ const useAuth = () => useContext(AuthContext);
 // ─── MOCK DATA ────────────────────────────────────────────────
 const MOCK_SPOTS = [
   { id:"s1", make:"Lamborghini", model:"Huracán STO", year:2023, rarity:"Exotic", color:"Verde Mantis",
-    location:"Rodeo Drive, Beverly Hills", image:"https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=900&q=85",
+    location:"Rodeo Drive, Beverly Hills", image:"https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=600&q=75&fm=webp",
     likes:2841, comments:94, saves:312, time:"12m ago", tags:["Lamborghini","STO","TrackSpecial"],
     liked:false, saved:false, description:"Caught this STO parked outside Gucci. Verde Mantis in person is something else.",
     user:{ handle:"apex_hunter", initials:"AH", verified:true } },
   { id:"s2", make:"Ferrari", model:"SF90 Stradale", year:2022, rarity:"Hypercar", color:"Rosso Corsa",
-    location:"Monaco, Monte Carlo", image:"https://images.unsplash.com/photo-1583121274602-3e2820c69888?w=900&q=85",
+    location:"Monaco, Monte Carlo", image:"https://images.unsplash.com/photo-1583121274602-3e2820c69888?w=600&q=75&fm=webp",
     likes:5102, comments:218, saves:891, time:"1h ago", tags:["Ferrari","SF90","Hybrid"],
     liked:true, saved:false, description:"SF90 rolling out of Casino Square. Rosso Corsa with Assetto Fiorano pack.",
     user:{ handle:"euro_spotter", initials:"LM", verified:false } },
   { id:"s3", make:"Bugatti", model:"Chiron Super Sport", year:2023, rarity:"Hypercar", color:"Atlantic Blue",
-    location:"Shibuya, Tokyo", image:"https://images.unsplash.com/photo-1525609004556-c46c7d6cf023?w=900&q=85",
+    location:"Shibuya, Tokyo", image:"https://images.unsplash.com/photo-1525609004556-c46c7d6cf023?w=600&q=75&fm=webp",
     likes:9441, comments:507, saves:2103, time:"3h ago", tags:["Bugatti","Chiron","1500HP"],
     liked:false, saved:true, description:"Never thought I'd see a Chiron SS in Shibuya. The W16 sound was insane.",
     user:{ handle:"jdm_tokyo", initials:"KT", verified:true } },
@@ -1196,11 +1196,11 @@ function EditProfileSheet({ onClose }) {
 
 // ─── STORIES ──────────────────────────────────────────────────
 const MOCK_STORIES = [
-  { id:"st1", handle:"jdm_tokyo",    initials:"KT", image:"https://images.unsplash.com/photo-1525609004556-c46c7d6cf023?w=600&q=80", make:"Bugatti",     model:"Chiron SS",    rarity:"Hypercar", location:"Shibuya, Tokyo",       viewed:false, expiresAt: Date.now() + 18*3600000 },
-  { id:"st2", handle:"euro_spotter", initials:"LM", image:"https://images.unsplash.com/photo-1583121274602-3e2820c69888?w=600&q=80", make:"Ferrari",      model:"SF90",         rarity:"Hypercar", location:"Monaco",               viewed:false, expiresAt: Date.now() + 12*3600000 },
-  { id:"st3", handle:"apex_hunter",  initials:"AH", image:"https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=600&q=80",  make:"Lamborghini",  model:"Huracán STO",  rarity:"Exotic",   location:"Beverly Hills",        viewed:true,  expiresAt: Date.now() + 6*3600000  },
-  { id:"st4", handle:"gulf_spots",   initials:"OR", image:"https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=600&q=80",  make:"McLaren",      model:"765LT",        rarity:"Exotic",   location:"Dubai Marina",         viewed:false, expiresAt: Date.now() + 20*3600000 },
-  { id:"st5", handle:"la_spotter",   initials:"MW", image:"https://images.unsplash.com/photo-1493238792000-8113da705763?w=600&q=80",make:"Porsche",      model:"GT3 RS",       rarity:"Sports",   location:"Santa Monica",         viewed:true,  expiresAt: Date.now() + 3*3600000  },
+  { id:"st1", handle:"jdm_tokyo",    initials:"KT", image:"https://images.unsplash.com/photo-1525609004556-c46c7d6cf023?w=600&q=75&fm=webp", make:"Bugatti",     model:"Chiron SS",    rarity:"Hypercar", location:"Shibuya, Tokyo",       viewed:false, expiresAt: Date.now() + 18*3600000 },
+  { id:"st2", handle:"euro_spotter", initials:"LM", image:"https://images.unsplash.com/photo-1583121274602-3e2820c69888?w=600&q=75&fm=webp", make:"Ferrari",      model:"SF90",         rarity:"Hypercar", location:"Monaco",               viewed:false, expiresAt: Date.now() + 12*3600000 },
+  { id:"st3", handle:"apex_hunter",  initials:"AH", image:"https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=600&q=75&fm=webp",  make:"Lamborghini",  model:"Huracán STO",  rarity:"Exotic",   location:"Beverly Hills",        viewed:true,  expiresAt: Date.now() + 6*3600000  },
+  { id:"st4", handle:"gulf_spots",   initials:"OR", image:"https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=600&q=75&fm=webp",  make:"McLaren",      model:"765LT",        rarity:"Exotic",   location:"Dubai Marina",         viewed:false, expiresAt: Date.now() + 20*3600000 },
+  { id:"st5", handle:"la_spotter",   initials:"MW", image:"https://images.unsplash.com/photo-1493238792000-8113da705763?w=600&q=75&fm=webp",make:"Porsche",      model:"GT3 RS",       rarity:"Sports",   location:"Santa Monica",         viewed:true,  expiresAt: Date.now() + 3*3600000  },
 ];
 
 function StoriesRow({ profile, onAddStory }) {
@@ -1738,50 +1738,169 @@ function StoryUploadModal({ onClose }) {
 }
 
 // ─── SCREENS ──────────────────────────────────────────────────
+// ─── IMAGE OPTIMISATION HELPER ────────────────────────────────
+// Adds width + quality params to Unsplash URLs, converts to WebP
+const imgUrl = (url, w = 600) => {
+  if (!url) return null;
+  if (url.includes("unsplash.com")) {
+    const base = url.split("?")[0];
+    return `${base}?w=${w}&q=75&fm=webp&fit=crop`;
+  }
+  return url; // Supabase Storage or other CDN — return as-is
+};
+
+// ─── QUERY CACHE ──────────────────────────────────────────────
+// Simple in-memory cache so switching tabs doesn't refetch
+const queryCache = new Map();
+const CACHE_TTL = 60000; // 1 minute
+
+const cachedFetch = async (key, fetcher) => {
+  const cached = queryCache.get(key);
+  if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
+  const data = await fetcher();
+  queryCache.set(key, { data, ts: Date.now() });
+  return data;
+};
+
+const PAGE_SIZE = 10;
+
 function FeedScreen({ onSpotTap }) {
   const { profile } = useAuth();
-  const [spots,      setSpots]      = useState([]);
-  const [loading,    setLoading]    = useState(true);
+  const [spots,         setSpots]         = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [loadingMore,   setLoadingMore]   = useState(false);
+  const [hasMore,       setHasMore]       = useState(true);
+  const [page,          setPage]          = useState(0);
   const [showStoryUpload, setShowStoryUpload] = useState(false);
   const [showPushBanner,  setShowPushBanner]  = useState(() =>
     typeof Notification !== "undefined" && Notification.permission === "default"
   );
+  const bottomRef   = useRef(null);
+  const channelRef  = useRef(null);
 
+  const mapSpot = (s) => ({
+    ...s,
+    image:    imgUrl(s.image_url, 600),
+    location: s.location_name,
+    likes:    s.likes_count    || 0,
+    saves:    s.saves_count    || 0,
+    comments: s.comments_count || 0,
+    time:     timeAgo(s.created_at),
+    tags:     [],
+    liked:    false,
+    saved:    false,
+    user: {
+      handle:    s.profiles?.handle     || "spotter",
+      avatar_url:s.profiles?.avatar_url,
+      initials:  (s.profiles?.handle    || "SP").slice(0,2).toUpperCase(),
+    },
+  });
+
+  const timeAgo = (ts) => {
+    if (!ts) return "";
+    const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
+    if (m < 1)    return "just now";
+    if (m < 60)   return `${m}m ago`;
+    if (m < 1440) return `${Math.floor(m/60)}h ago`;
+    return `${Math.floor(m/1440)}d ago`;
+  };
+
+  // Initial load with cache
   useEffect(() => {
     const load = async () => {
-      const { data } = await supabase.from("spots")
-        .select("*, profiles(handle, avatar_url)")
-        .eq("status","live").order("created_at",{ascending:false}).limit(20);
+      const data = await cachedFetch("feed-page-0", async () => {
+        const { data } = await supabase.from("spots")
+          .select("*, profiles(handle, avatar_url)")
+          .eq("status", "live")
+          .order("created_at", { ascending: false })
+          .range(0, PAGE_SIZE - 1);
+        return data;
+      });
+
       if (data && data.length > 0) {
-        setSpots(data.map(s => ({
-          ...s, image:s.image_url, location:s.location_name,
-          likes:s.likes_count||0, saves:s.saves_count||0, comments:s.comments_count||0,
-          time:timeAgo(s.created_at), tags:[], liked:false, saved:false,
-          user:{ handle:s.profiles?.handle||"spotter", avatar_url:s.profiles?.avatar_url,
-                 initials:(s.profiles?.handle||"SP").slice(0,2).toUpperCase() }
-        })));
-      } else { setSpots(MOCK_SPOTS); }
+        setSpots(data.map(mapSpot));
+        setHasMore(data.length === PAGE_SIZE);
+      } else {
+        setSpots(MOCK_SPOTS.map(s => ({ ...s, image: imgUrl(s.image, 600) })));
+        setHasMore(false);
+      }
       setLoading(false);
     };
     load();
   }, []);
 
-  const timeAgo = (ts) => {
-    if (!ts) return "";
-    const m = Math.floor((Date.now()-new Date(ts).getTime())/60000);
-    if (m<1) return "just now"; if (m<60) return `${m}m ago`;
-    if (m<1440) return `${Math.floor(m/60)}h ago`; return `${Math.floor(m/1440)}d ago`;
+  // ── Real-time new spots ──────────────────────────────────────
+  useEffect(() => {
+    channelRef.current = supabase
+      .channel("feed-realtime")
+      .on("postgres_changes", {
+        event:  "INSERT",
+        schema: "public",
+        table:  "spots",
+        filter: "status=eq.live",
+      }, async (payload) => {
+        // Fetch full spot with profile
+        const { data } = await supabase.from("spots")
+          .select("*, profiles(handle, avatar_url)")
+          .eq("id", payload.new.id)
+          .single();
+        if (data) {
+          setSpots(prev => [mapSpot(data), ...prev]);
+          // Invalidate cache
+          queryCache.delete("feed-page-0");
+        }
+      })
+      .subscribe();
+
+    return () => {
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
+    };
+  }, []);
+
+  // ── Infinite scroll observer ─────────────────────────────────
+  useEffect(() => {
+    if (!bottomRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(bottomRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, loading, page]);
+
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const nextPage = page + 1;
+    const from = nextPage * PAGE_SIZE;
+    const to   = from + PAGE_SIZE - 1;
+
+    const { data } = await supabase.from("spots")
+      .select("*, profiles(handle, avatar_url)")
+      .eq("status", "live")
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    if (data && data.length > 0) {
+      setSpots(prev => [...prev, ...data.map(mapSpot)]);
+      setPage(nextPage);
+      setHasMore(data.length === PAGE_SIZE);
+    } else {
+      setHasMore(false);
+    }
+    setLoadingMore(false);
   };
 
   return (
     <div>
-      {/* Stories row */}
       <StoriesRow profile={profile} onAddStory={() => setShowStoryUpload(true)} />
 
-      {/* Push notification banner */}
       {showPushBanner && <PushNotificationBanner onDismiss={() => setShowPushBanner(false)} />}
 
-      {/* Trending banner */}
       <div style={{ margin:"10px 14px", padding:"10px 14px", background:"#2D1200",
         border:"1px solid rgba(232,67,10,.3)", borderRadius:12,
         display:"flex", alignItems:"center", gap:8, fontSize:13 }}>
@@ -1790,7 +1909,6 @@ function FeedScreen({ onSpotTap }) {
         <span style={{ color:"#6B6878" }}>Bugatti Chiron SS in Tokyo · 9.4k likes</span>
       </div>
 
-      {/* Feed cards */}
       <div style={{ display:"flex", flexDirection:"column", gap:14, padding:"0 14px 14px" }}>
         {loading
           ? Array(3).fill(0).map((_,i) => (
@@ -1810,6 +1928,24 @@ function FeedScreen({ onSpotTap }) {
             ))
           : spots.map(s => <SpotCard key={s.id} spot={s} onTap={onSpotTap} />)
         }
+
+        {/* Infinite scroll trigger */}
+        <div ref={bottomRef} style={{ height:20 }} />
+
+        {/* Loading more indicator */}
+        {loadingMore && (
+          <div style={{ display:"flex", justifyContent:"center", padding:"16px 0" }}>
+            <Spinner size={24} />
+          </div>
+        )}
+
+        {/* End of feed */}
+        {!hasMore && !loading && spots.length > 0 && (
+          <div style={{ textAlign:"center", padding:"20px 0",
+            fontSize:12, color:"#3D3D4E" }}>
+            You've seen all the spots 🏎
+          </div>
+        )}
       </div>
 
       {showStoryUpload && <StoryUploadModal onClose={() => setShowStoryUpload(false)} />}
@@ -2062,22 +2198,37 @@ function ExploreScreen({ onSpotTap }) {
   const [loadingSpotters, setLoadingSpotters] = useState(false);
   const [viewProfile, setViewProfile] = useState(null);
 
-  // Load spotters from Supabase
+  const TRENDING_SPOTTERS = [
+    { id:"t1", handle:"jdm_tokyo",    display_name:"Kenji Tanaka",   followers_count:91000, spots_count:1204, initials:"KT", avatar_url:null, is_verified:true  },
+    { id:"t2", handle:"euro_spotter", display_name:"Lena Müller",    followers_count:54200, spots_count:889,  initials:"LM", avatar_url:null, is_verified:false },
+    { id:"t3", handle:"gulf_spots",   display_name:"Omar Al-Rashid", followers_count:38700, spots_count:567,  initials:"OR", avatar_url:null, is_verified:true  },
+    { id:"t4", handle:"apex_hunter",  display_name:"Tyler Rhodes",   followers_count:18400, spots_count:412,  initials:"AH", avatar_url:null, is_verified:false },
+    { id:"t5", handle:"la_spotter",   display_name:"Marcus Webb",    followers_count:12100, spots_count:203,  initials:"MW", avatar_url:null, is_verified:false },
+    { id:"t6", handle:"nring_nut",    display_name:"Hans Fischer",   followers_count:8300,  spots_count:145,  initials:"HF", avatar_url:null, is_verified:false },
+    { id:"t7", handle:"tokyo_drift",  display_name:"Yuki Tanaka",    followers_count:7200,  spots_count:98,   initials:"YT", avatar_url:null, is_verified:false },
+    { id:"t8", handle:"monza_mike",   display_name:"Mike Rossetti",  followers_count:6100,  spots_count:87,   initials:"MR", avatar_url:null, is_verified:false },
+    { id:"t9", handle:"hypercar_hq",  display_name:"The Hypercar HQ",followers_count:5400,  spots_count:312,  initials:"HH", avatar_url:null, is_verified:true  },
+    { id:"t10",handle:"spotking_au",  display_name:"Blake Morrison", followers_count:4800,  spots_count:76,   initials:"BM", avatar_url:null, is_verified:false },
+  ];
+
+  // Load spotters — merge real users with trending mock list
   useEffect(() => {
     if (tab !== "spotters") return;
     setLoadingSpotters(true);
     supabase.from("profiles").select("*")
       .order("followers_count", { ascending:false }).limit(20)
       .then(({ data }) => {
-        if (data && data.length > 0) setSpotters(data);
-        else setSpotters([
-          { id:"mock1", handle:"apex_hunter",     display_name:"Tyler Rhodes",   followers_count:18400, spots_count:412, is_verified:true,  initials:"TR" },
-          { id:"mock2", handle:"euro_spotter",     display_name:"Lena Müller",    followers_count:54200, spots_count:889, is_verified:false, initials:"LM" },
-          { id:"mock3", handle:"jdm_tokyo",        display_name:"Kenji Tanaka",   followers_count:91000, spots_count:1204,is_verified:true,  initials:"KT" },
-          { id:"mock4", handle:"la_spotter",       display_name:"Marcus Webb",    followers_count:12100, spots_count:203, is_verified:false, initials:"MW" },
-          { id:"mock5", handle:"gulf_spots",       display_name:"Omar Al-Rashid", followers_count:38700, spots_count:567, is_verified:true,  initials:"OR" },
-          { id:"mock6", handle:"nring_nut",        display_name:"Hans Fischer",   followers_count:8300,  spots_count:145, is_verified:false, initials:"HF" },
-        ]);
+        // Always show trending spotters, append any real users who aren't already in list
+        const realHandles = new Set(TRENDING_SPOTTERS.map(s => s.handle));
+        const realExtras = (data || [])
+          .filter(p => !realHandles.has(p.handle))
+          .map(p => ({
+            ...p,
+            initials: (p.handle||"SP").slice(0,2).toUpperCase(),
+          }));
+        // Shuffle trending slightly for freshness
+        const shuffled = [...TRENDING_SPOTTERS].sort(() => Math.random() - 0.3);
+        setSpotters([...shuffled, ...realExtras]);
         setLoadingSpotters(false);
       });
   }, [tab]);
@@ -2171,12 +2322,6 @@ function ExploreScreen({ onSpotTap }) {
                 style={{ display:"flex", alignItems:"center", gap:12, padding:"13px 0",
                   borderBottom:"1px solid #252530", cursor:"pointer" }}
                 onClick={() => setViewProfile(spotter.handle)}>
-                {/* Rank */}
-                <div style={{ width:20, textAlign:"center", flexShrink:0,
-                  fontFamily:"'Barlow Condensed',sans-serif", fontSize:14,
-                  fontWeight:900, color: i===0?"#C9A84C":i===1?"#AAA6A0":i===2?"#CD7F32":"#3D3D4E" }}>
-                  {i+1}
-                </div>
                 <Avatar initials={spotter.initials || spotter.handle?.slice(0,2).toUpperCase() || "SP"}
                   src={spotter.avatar_url} size={48} />
                 <div style={{ flex:1, minWidth:0 }}>
@@ -3875,31 +4020,87 @@ function PushNotificationBanner({ onDismiss }) {
   );
 }
 
+// ─── ERROR BOUNDARY ───────────────────────────────────────────
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError:false, error:null }; }
+  static getDerivedStateFromError(e) { return { hasError:true, error:e }; }
+  componentDidCatch(e, info) { console.error("SpotDrive crash:", e, info); }
+  render() {
+    if (!this.state.hasError) return this.props.children;
+    return (
+      <div style={{ minHeight:"100vh", background:"#0A0A0C", display:"flex",
+        alignItems:"center", justifyContent:"center", flexDirection:"column",
+        gap:16, padding:24, textAlign:"center" }}>
+        <div style={{ fontSize:48 }}>⚠️</div>
+        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:24,
+          fontWeight:900, color:"#F2EEE8" }}>Something went wrong</div>
+        <div style={{ fontSize:13, color:"#6B6878", maxWidth:280, lineHeight:1.6 }}>
+          {this.state.error?.message || "An unexpected error occurred."}
+        </div>
+        <button onClick={() => window.location.reload()}
+          style={{ padding:"12px 24px", borderRadius:12,
+            background:"linear-gradient(135deg,#E8430A,#BF360C)",
+            border:"none", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>
+          Reload App
+        </button>
+      </div>
+    );
+  }
+}
+
 function AppContent() {
   const { user, loading } = useAuth();
+  const [timedOut,  setTimedOut]  = useState(false);
   const [onboarded, setOnboarded] = useState(() =>
     typeof localStorage !== "undefined" && !!localStorage.getItem(ONBOARDING_KEY)
+  );
+
+  // 10-second auth timeout
+  useEffect(() => {
+    if (!loading) return;
+    const t = setTimeout(() => setTimedOut(true), 10000);
+    return () => clearTimeout(t);
+  }, [loading]);
+
+  if (timedOut && loading) return (
+    <div style={{ minHeight:"100vh", background:"#0A0A0C", display:"flex",
+      alignItems:"center", justifyContent:"center", flexDirection:"column",
+      gap:16, padding:24, textAlign:"center" }}>
+      <div style={{ fontSize:48 }}>🌐</div>
+      <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:22,
+        fontWeight:900, color:"#F2EEE8" }}>Connection slow</div>
+      <div style={{ fontSize:13, color:"#6B6878" }}>Check your connection and try again.</div>
+      <button onClick={() => window.location.reload()}
+        style={{ padding:"12px 24px", borderRadius:12,
+          background:"linear-gradient(135deg,#E8430A,#BF360C)",
+          border:"none", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>
+        Retry
+      </button>
+    </div>
   );
 
   if (loading) return (
     <div style={{ minHeight:"100vh", background:"#0A0A0C", display:"flex",
       alignItems:"center", justifyContent:"center", flexDirection:"column", gap:16 }}>
-      <div style={{ width:56, height:56, borderRadius:14, background:"linear-gradient(135deg,#E8430A,#BF360C)",
+      <div style={{ width:56, height:56, borderRadius:14,
+        background:"linear-gradient(135deg,#E8430A,#BF360C)",
         display:"flex", alignItems:"center", justifyContent:"center", fontSize:28 }}>🏎</div>
       <Spinner size={24} />
+      <div style={{ fontSize:12, color:"#6B6878" }}>Loading SpotDrive…</div>
     </div>
   );
 
-  if (!user) return <AuthScreen />;
+  if (!user)      return <AuthScreen />;
   if (!onboarded) return <OnboardingFlow onDone={() => setOnboarded(true)} />;
   return <MainApp />;
 }
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
-
