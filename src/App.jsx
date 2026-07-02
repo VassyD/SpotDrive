@@ -285,9 +285,23 @@ function SignupForm({ onSwitch }) {
   if (success) return (
     <div style={{ background:"#14141A", border:"1px solid #252530", borderRadius:20, padding:28, textAlign:"center" }}>
       <div style={{ fontSize:48, marginBottom:12 }}>📧</div>
-      <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:22, fontWeight:900, color:"#F2EEE8", marginBottom:8 }}>Check your email</div>
-      <div style={{ fontSize:13, color:"#6B6878", marginBottom:20 }}>Confirmation sent to <strong style={{ color:"#F2EEE8" }}>{form.email}</strong></div>
-      <button className="sd-btn sd-btn-ghost" onClick={() => onSwitch("login")} style={{ maxWidth:200, margin:"0 auto" }}>Back to sign in</button>
+      <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:22, fontWeight:900, color:"#F2EEE8", marginBottom:8 }}>
+        Check your email
+      </div>
+      <div style={{ fontSize:13, color:"#6B6878", lineHeight:1.65, marginBottom:8 }}>
+        We sent a confirmation link to
+      </div>
+      <div style={{ fontSize:14, fontWeight:700, color:"#F2EEE8", marginBottom:12 }}>
+        {form.email}
+      </div>
+      <div style={{ fontSize:12, color:"#6B6878", lineHeight:1.65, marginBottom:20,
+        background:"#18181F", borderRadius:10, padding:"10px 14px",
+        border:"1px solid #252530" }}>
+        Click the link in the email to activate your account. Check your spam folder if you don't see it within a minute.
+      </div>
+      <button className="sd-btn sd-btn-ghost" onClick={() => onSwitch("login")} style={{ maxWidth:200, margin:"0 auto" }}>
+        Back to sign in
+      </button>
     </div>
   );
 
@@ -4092,7 +4106,65 @@ function PushNotificationBanner({ onDismiss }) {
   );
 }
 
-// ─── ERROR BOUNDARY ───────────────────────────────────────────
+// ─── EMAIL CONFIRMATION HANDLER ───────────────────────────────
+function useEmailConfirmation() {
+  const [confirming, setConfirming] = useState(false);
+  const [confirmed,  setConfirmed]  = useState(false);
+  const [confError,  setConfError]  = useState(null);
+
+  useEffect(() => {
+    // Supabase puts the token in the URL hash after email confirmation
+    const hash = window.location.hash;
+    if (!hash) return;
+
+    const params = new URLSearchParams(hash.replace("#", "?"));
+    const accessToken  = params.get("access_token");
+    const refreshToken = params.get("refresh_token");
+    const type         = params.get("type");
+
+    if (!accessToken) return;
+
+    setConfirming(true);
+
+    // Set the session from the URL tokens
+    supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+      .then(({ error }) => {
+        if (error) {
+          setConfError(error.message);
+        } else {
+          setConfirmed(true);
+          // Clean up the URL hash
+          window.history.replaceState(null, "", window.location.pathname);
+        }
+      })
+      .finally(() => setConfirming(false));
+  }, []);
+
+  return { confirming, confirmed, confError };
+}
+
+function EmailConfirmedScreen() {
+  return (
+    <div style={{ minHeight:"100vh", background:"#0A0A0C", display:"flex",
+      alignItems:"center", justifyContent:"center", flexDirection:"column",
+      gap:16, padding:24, textAlign:"center" }}>
+      <div style={{ width:72, height:72, borderRadius:20,
+        background:"linear-gradient(135deg,#22C55E,#16A34A)",
+        display:"flex", alignItems:"center", justifyContent:"center",
+        fontSize:36, marginBottom:8 }}>✅</div>
+      <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:32,
+        fontWeight:900, color:"#F2EEE8" }}>Email Confirmed!</div>
+      <div style={{ fontSize:14, color:"#6B6878", maxWidth:280, lineHeight:1.6 }}>
+        Your SpotDrive account is now active. Welcome to the community 🏎
+      </div>
+      <div style={{ display:"flex", alignItems:"center", gap:8,
+        marginTop:8, fontSize:12, color:"#22C55E" }}>
+        <Spinner size={14} color="#22C55E" />
+        Taking you to the app…
+      </div>
+    </div>
+  );
+}
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError:false, error:null }; }
   static getDerivedStateFromError(e) { return { hasError:true, error:e }; }
@@ -4122,6 +4194,7 @@ class ErrorBoundary extends React.Component {
 
 function AppContent() {
   const { user, loading } = useAuth();
+  const { confirming, confirmed, confError } = useEmailConfirmation();
   const [timedOut,  setTimedOut]  = useState(false);
   const [onboarded, setOnboarded] = useState(() =>
     typeof localStorage !== "undefined" && !!localStorage.getItem(ONBOARDING_KEY)
@@ -4133,6 +4206,39 @@ function AppContent() {
     const t = setTimeout(() => setTimedOut(true), 10000);
     return () => clearTimeout(t);
   }, [loading]);
+
+  // Show confirming spinner while processing token
+  if (confirming) return (
+    <div style={{ minHeight:"100vh", background:"#0A0A0C", display:"flex",
+      alignItems:"center", justifyContent:"center", flexDirection:"column", gap:16 }}>
+      <div style={{ width:56, height:56, borderRadius:14,
+        background:"linear-gradient(135deg,#E8430A,#BF360C)",
+        display:"flex", alignItems:"center", justifyContent:"center", fontSize:28 }}>🏎</div>
+      <Spinner size={24} />
+      <div style={{ fontSize:13, color:"#6B6878" }}>Confirming your email…</div>
+    </div>
+  );
+
+  // Show error if confirmation failed
+  if (confError) return (
+    <div style={{ minHeight:"100vh", background:"#0A0A0C", display:"flex",
+      alignItems:"center", justifyContent:"center", flexDirection:"column",
+      gap:16, padding:24, textAlign:"center" }}>
+      <div style={{ fontSize:48 }}>⚠️</div>
+      <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:24,
+        fontWeight:900, color:"#F2EEE8" }}>Confirmation failed</div>
+      <div style={{ fontSize:13, color:"#6B6878", maxWidth:280 }}>{confError}</div>
+      <button onClick={() => window.location.href = "/"}
+        style={{ padding:"12px 24px", borderRadius:12,
+          background:"linear-gradient(135deg,#E8430A,#BF360C)",
+          border:"none", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>
+        Back to Sign In
+      </button>
+    </div>
+  );
+
+  // Brief success screen then auto-proceeds to app
+  if (confirmed && !user) return <EmailConfirmedScreen />;
 
   if (timedOut && loading) return (
     <div style={{ minHeight:"100vh", background:"#0A0A0C", display:"flex",
