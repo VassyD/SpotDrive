@@ -365,12 +365,16 @@ function ForgotForm({ onSwitch }) {
 
 // ─── SPOT CARD ────────────────────────────────────────────────
 function SpotCard({ spot, onTap }) {
-  const [liked, setLiked] = useState(spot.liked);
-  const [saved, setSaved] = useState(spot.saved);
-  const [likes, setLikes] = useState(spot.likes);
-  const [saves, setSaves] = useState(spot.saves);
-  const [pop,   setPop]   = useState(false);
-  const [imgErr, setImgErr] = useState(false);
+  const { user } = useAuth();
+  const [liked,     setLiked]     = useState(spot.liked);
+  const [saved,     setSaved]     = useState(spot.saved);
+  const [likes,     setLikes]     = useState(spot.likes);
+  const [saves,     setSaves]     = useState(spot.saves);
+  const [pop,       setPop]       = useState(false);
+  const [imgErr,    setImgErr]    = useState(false);
+  const [showMenu,  setShowMenu]  = useState(false);
+  const [reported,  setReported]  = useState(false);
+  const [reporting, setReporting] = useState(false);
 
   const handleLike = (e) => {
     e.stopPropagation();
@@ -381,9 +385,65 @@ function SpotCard({ spot, onTap }) {
     e.stopPropagation();
     const next = !saved; setSaved(next); setSaves(n => next ? n+1 : n-1);
   };
+  const handleReport = async (reason) => {
+    if (!user || reported || reporting) return;
+    setReporting(true);
+    try {
+      // Increment report_count — trigger auto-hides at 5
+      await supabase.rpc("increment_report_count", { spot_id: spot.id })
+        .catch(async () => {
+          // Fallback if RPC not set up
+          const { data } = await supabase.from("spots")
+            .select("report_count").eq("id", spot.id).single();
+          if (data) {
+            await supabase.from("spots")
+              .update({ report_count: (data.report_count||0) + 1 })
+              .eq("id", spot.id);
+          }
+        });
+      setReported(true);
+    } catch(e) { console.error(e); }
+    finally { setReporting(false); setShowMenu(false); }
+  };
+
+  const isOwnSpot = user && spot.user_id === user.id;
 
   return (
-    <div className="spot-card fade-up" onClick={() => onTap?.(spot)} style={{ cursor:"pointer" }}>
+    <div className="spot-card fade-up" onClick={() => onTap?.(spot)} style={{ cursor:"pointer", position:"relative" }}>
+      {/* Report menu */}
+      {showMenu && (
+        <div style={{ position:"absolute", top:10, right:10, zIndex:20,
+          background:"#1C1C24", border:"1px solid #252530", borderRadius:12,
+          overflow:"hidden", boxShadow:"0 8px 24px rgba(0,0,0,.6)", minWidth:180 }}
+          onClick={e => e.stopPropagation()}>
+          <div style={{ padding:"10px 14px", fontSize:11, fontWeight:700,
+            color:"#6B6878", textTransform:"uppercase", letterSpacing:".06em",
+            borderBottom:"1px solid #252530" }}>
+            Report this spot
+          </div>
+          {[
+            "Inappropriate content",
+            "Fake or misleading",
+            "Spam",
+            "Wrong car make/model",
+            "Other",
+          ].map(reason => (
+            <button key={reason} onClick={() => handleReport(reason)}
+              style={{ width:"100%", padding:"10px 14px", background:"none",
+                border:"none", borderBottom:"1px solid #252530",
+                color:"#F2EEE8", fontSize:13, textAlign:"left", cursor:"pointer" }}>
+              {reason}
+            </button>
+          ))}
+          <button onClick={() => setShowMenu(false)}
+            style={{ width:"100%", padding:"10px 14px", background:"none",
+              border:"none", color:"#6B6878", fontSize:13,
+              textAlign:"left", cursor:"pointer" }}>
+            Cancel
+          </button>
+        </div>
+      )}
+
       <div style={{ position:"relative", paddingTop:"62%", overflow:"hidden" }}>
         {!imgErr && spot.image
           ? <img src={spot.image} alt={`${spot.make} ${spot.model}`} loading="lazy"
@@ -424,7 +484,19 @@ function SpotCard({ spot, onTap }) {
             style={{ display:"flex", alignItems:"center", gap:5, color:saved?"#C9A84C":"#6B6878", fontSize:12, fontWeight:600, border:"none", background:"none" }}>
             {saved?"🔖":"📎"} {fmt(saves)}
           </button>
-          <button style={{ marginLeft:"auto", color:"#6B6878", border:"none", background:"none" }}>↗</button>
+          {/* Report / More button — only show for other users' spots */}
+          {!isOwnSpot && (
+            <button
+              onClick={e => { e.stopPropagation(); reported ? null : setShowMenu(m => !m); }}
+              style={{ marginLeft:"auto", color: reported ? "#22C55E" : "#6B6878",
+                border:"none", background:"none", fontSize:14, cursor: reported ? "default" : "pointer" }}
+              title={reported ? "Reported" : "More options"}>
+              {reported ? "✓ Reported" : "···"}
+            </button>
+          )}
+          {isOwnSpot && (
+            <button style={{ marginLeft:"auto", color:"#6B6878", border:"none", background:"none", fontSize:14 }}>↗</button>
+          )}
         </div>
       </div>
     </div>
