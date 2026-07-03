@@ -1,0 +1,71 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit-and-mocked-tests:
+    name: Unit + mocked integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run test suite (unit + mocked)
+        run: npm test
+
+  live-rls-tests:
+    name: Live RLS tests (real Postgres via Supabase CLI)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # ubuntu-latest runners have Docker pre-installed, so `supabase start`
+      # works out of the box — no login/link needed for a purely local stack.
+      - name: Start local Supabase stack
+        run: supabase start
+
+      - name: Export local Supabase credentials to env
+        run: |
+          STATUS=$(supabase status -o env)
+          echo "$STATUS"
+
+          API_URL=$(echo "$STATUS" | grep -m1 '^API_URL=' | cut -d'=' -f2- | tr -d '"')
+          ANON_KEY=$(echo "$STATUS" | grep -m1 '^ANON_KEY=' | cut -d'=' -f2- | tr -d '"')
+          SERVICE_ROLE_KEY=$(echo "$STATUS" | grep -m1 '^SERVICE_ROLE_KEY=' | cut -d'=' -f2- | tr -d '"')
+
+          echo "SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
+          echo "SUPABASE_ANON_KEY=$ANON_KEY" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
+
+      - name: Run live RLS integration tests
+        run: npx vitest run tests/integration/rls-live.test.ts
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: supabase stop
