@@ -399,26 +399,22 @@ function SpotCard({ spot, onTap }) {
     e.stopPropagation();
     const next = !saved; setSaved(next); setSaves(n => next ? n+1 : n-1);
   };
-  const handleReport = async (reason) => {
-    if (!user || reported || reporting) return;
-    setReporting(true);
-    try {
-      // Increment report_count — trigger auto-hides at 5
-      await supabase.rpc("increment_report_count", { spot_id: spot.id })
-        .catch(async () => {
-          // Fallback if RPC not set up
-          const { data } = await supabase.from("spots")
-            .select("report_count").eq("id", spot.id).single();
-          if (data) {
-            await supabase.from("spots")
-              .update({ report_count: (data.report_count||0) + 1 })
-              .eq("id", spot.id);
-          }
-        });
-      setReported(true);
-    } catch(e) { console.error(e); }
-    finally { setReporting(false); setShowMenu(false); }
-  };
+const handleReport = async (reason) => {
+  if (!user || reported || reporting) return;
+  setReporting(true);
+  try {
+    const { error } = await supabase.from("reports").insert({
+      spot_id: spot.id,
+      reporter_id: user.id,
+      reason,
+    });
+    // 23505 = unique_violation (already reported this spot) — treat as
+    // success from the user's perspective rather than an error.
+    if (error && error.code !== "23505") throw error;
+    setReported(true);
+  } catch(e) { console.error(e); }
+  finally { setReporting(false); setShowMenu(false); }
+};
 
   const isOwnSpot = user && spot.user_id === user.id;
 
