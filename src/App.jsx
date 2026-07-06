@@ -2436,6 +2436,18 @@ function SpotterProfileSheet({ handle, onClose }) {
   const [spots,    setSpots]    = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [tab,      setTab]      = useState("spots");
+  const [showReportMenu, setShowReportMenu] = useState(false);
+  const [reportedUser, setReportedUser] = useState(false);
+
+  const handleReportUser = async (reason) => {
+    if (!user || !spotter || reportedUser) return;
+    const { error } = await supabase.from("reports").insert({
+      reported_user_id: spotter.id, reporter_id: user.id, reason,
+    });
+    if (error && error.code !== "23505") { console.error(error); return; }
+    setReportedUser(true);
+    setShowReportMenu(false);
+  };
 
   useEffect(() => {
     if (!handle) return;
@@ -2474,7 +2486,35 @@ function SpotterProfileSheet({ handle, onClose }) {
                 justifyContent:"center", color:"#6B6878", fontSize:18, cursor:"pointer" }}>
               ‹
             </button>
-            <span style={{ fontSize:15, fontWeight:700, color:"#F2EEE8" }}>@{handle}</span>
+            <span style={{ fontSize:15, fontWeight:700, color:"#F2EEE8", flex:1 }}>@{handle}</span>
+            {user && spotter && user.id !== spotter.id && (
+              <div style={{ position:"relative" }}>
+                <button onClick={() => !reportedUser && setShowReportMenu(m => !m)}
+                  style={{ background:"none", border:"none", cursor: reportedUser ? "default" : "pointer",
+                    color: reportedUser ? "#22C55E" : "#6B6878", fontSize:18, padding:"4px 8px" }}>
+                  {reportedUser ? "✓" : "···"}
+                </button>
+                {showReportMenu && (
+                  <div style={{ position:"absolute", top:"100%", right:0, zIndex:20,
+                    background:"#1C1C24", border:"1px solid #252530", borderRadius:10,
+                    overflow:"hidden", boxShadow:"0 8px 24px rgba(0,0,0,.6)", minWidth:170 }}>
+                    <div style={{ padding:"8px 12px", fontSize:10, fontWeight:700,
+                      color:"#6B6878", textTransform:"uppercase", letterSpacing:".05em",
+                      borderBottom:"1px solid #252530" }}>
+                      Report this user
+                    </div>
+                    {["Harassment", "Impersonation", "Spam", "Inappropriate", "Other"].map(reason => (
+                      <button key={reason} onClick={() => handleReportUser(reason)}
+                        style={{ width:"100%", padding:"9px 12px", background:"none",
+                          border:"none", borderBottom:"1px solid #252530",
+                          color:"#F2EEE8", fontSize:12, textAlign:"left", cursor:"pointer" }}>
+                        {reason}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -3491,7 +3531,8 @@ function MainApp() {
 function CommentRow({ comment: c, user, profile, timeAgo, onReply }) {
   const [liked, setLiked] = useState(false);
   const [likes, setLikes] = useState(c.likes_count || 0);
-
+  const [showReportMenu, setShowReportMenu] = useState(false);
+  const [reported, setReported] = useState(false);
   const handleLike = () => {
     const next = !liked;
     setLiked(next);
@@ -3502,7 +3543,16 @@ function CommentRow({ comment: c, user, profile, timeAgo, onReply }) {
         .eq("id", c.id).catch(console.error);
     }
   };
-
+  const handleReportComment = async (reason) => {
+    if (!user || reported) return;
+    const { error } = await supabase.from("reports").insert({
+      comment_id: c.id, reporter_id: user.id, reason,
+    });
+    if (error && error.code !== "23505") { console.error(error); return; }
+    setReported(true);
+    setShowReportMenu(false);
+  };
+  
   return (
     <div style={{ display:"flex", gap:10, padding:"10px 16px",
       opacity: c.optimistic ? 0.6 : 1, transition:"opacity .3s" }}>
@@ -3521,12 +3571,35 @@ function CommentRow({ comment: c, user, profile, timeAgo, onReply }) {
               fontSize:12, fontWeight:600, transition:"color .15s" }}>
             {liked ? "❤️" : "🤍"}{likes > 0 ? ` ${likes}` : ""}
           </button>
-          {user && profile?.handle !== c.handle && (
+         {user && profile?.handle !== c.handle && (
             <button onClick={() => onReply(c.handle)}
               style={{ background:"none", border:"none", cursor:"pointer",
                 color:"#6B6878", fontSize:11, fontWeight:600 }}>
               Reply
             </button>
+          )}
+          {user && profile?.handle !== c.handle && (
+            <div style={{ position:"relative" }}>
+              <button onClick={() => !reported && setShowReportMenu(m => !m)}
+                style={{ background:"none", border:"none", cursor: reported ? "default" : "pointer",
+                  color: reported ? "#22C55E" : "#6B6878", fontSize:11, fontWeight:600 }}>
+                {reported ? "Reported" : "Report"}
+              </button>
+              {showReportMenu && (
+                <div style={{ position:"absolute", bottom:"100%", left:0, zIndex:20,
+                  background:"#1C1C24", border:"1px solid #252530", borderRadius:10,
+                  overflow:"hidden", boxShadow:"0 8px 24px rgba(0,0,0,.6)", minWidth:160, marginBottom:4 }}>
+                  {["Harassment", "Spam", "Inappropriate", "Other"].map(reason => (
+                    <button key={reason} onClick={() => handleReportComment(reason)}
+                      style={{ width:"100%", padding:"8px 12px", background:"none",
+                        border:"none", borderBottom:"1px solid #252530",
+                        color:"#F2EEE8", fontSize:12, textAlign:"left", cursor:"pointer" }}>
+                      {reason}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -3564,22 +3637,14 @@ function CommentsSheet({ spot, onClose }) {
         .order("created_at", { ascending: true })
         .limit(100);
 
-      if (data && data.length > 0) {
-        setComments(data.map(c => ({
+     setComments(
+        (data || []).map(c => ({
           ...c,
           handle:     c.profiles?.handle || "spotter",
           avatar_url: c.profiles?.avatar_url,
           initials:   (c.profiles?.handle || "SP").slice(0,2).toUpperCase(),
-        })));
-      } else {
-        // Mock comments for demo spots
-        setComments([
-          { id:"c1", text:"Absolute beast in person 🔥", handle:"euro_spotter", initials:"LM", created_at: new Date(Date.now()-30*60000).toISOString(), likes_count:12 },
-          { id:"c2", text:"Verde Mantis is the best colour they make. No debate.", handle:"jdm_tokyo",    initials:"KT", created_at: new Date(Date.now()-20*60000).toISOString(), likes_count:8 },
-          { id:"c3", text:"Track spec too? That cage in the back is unmistakable", handle:"apex_hunter",  initials:"AH", created_at: new Date(Date.now()-10*60000).toISOString(), likes_count:5 },
-          { id:"c4", text:"Was this on Rodeo last Saturday? I think I saw this!", handle:"la_spotter",    initials:"MW", created_at: new Date(Date.now()-5*60000).toISOString(),  likes_count:3 },
-        ]);
-      }
+        }))
+      );
       setLoading(false);
     };
     load();
