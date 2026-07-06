@@ -45,6 +45,8 @@ jobs:
         uses: supabase/setup-cli@v1
         with:
           version: latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ubuntu-latest runners have Docker pre-installed, so `supabase start`
       # works out of the box — no login/link needed for a purely local stack.
