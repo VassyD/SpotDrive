@@ -1328,6 +1328,19 @@ function AdminPanel({ onClose }) {
     setReports(prev => prev.filter(r => r.id !== reportId));
   };
 
+  const deleteReport = async (reportId) => {
+    const { error } = await supabase.from("reports").delete().eq("id", reportId);
+    if (error) { console.error(error); return; }
+    setReports(prev => prev.filter(r => r.id !== reportId));
+  };
+
+  const clearDismissedReports = async () => {
+    if (!window.confirm("Permanently delete all dismissed (reviewed) reports? This can't be undone.")) return;
+    const { error } = await supabase.from("reports").delete().eq("reviewed", true);
+    if (error) { console.error(error); return; }
+    setReports(prev => prev.filter(r => !r.reviewed));
+  };
+
   const unhideSpot = async (spotId, reportId) => {
     const { error } = await supabase.from("spots").update({ status: "live" }).eq("id", spotId);
     if (error) { console.error(error); return; }
@@ -1452,7 +1465,7 @@ const loadOffenders = useCallback(async () => {
             ))}
           </div>
           {section === "reports" && (
-            <div style={{ display:"flex", gap:8, marginBottom:14 }}>
+            <div style={{ display:"flex", gap:8, marginBottom:14, alignItems:"center" }}>
               {["pending", "all"].map(f => (
                 <button key={f} onClick={() => setFilter(f)}
                   style={{ padding:"6px 12px", borderRadius:8, fontSize:12, fontWeight:700,
@@ -1462,6 +1475,13 @@ const loadOffenders = useCallback(async () => {
                   {f === "pending" ? "Pending" : "All"}
                 </button>
               ))}
+              {filter === "all" && (
+                <button onClick={clearDismissedReports}
+                  style={{ marginLeft:"auto", padding:"6px 12px", borderRadius:8, fontSize:12, fontWeight:700,
+                    cursor:"pointer", border:"1px solid #6B6878", background:"none", color:"#6B6878" }}>
+                  Clear dismissed
+                </button>
+              )}
             </div>
           )}
           {section === "users" && (
@@ -1579,10 +1599,17 @@ const loadOffenders = useCallback(async () => {
                       Dismiss
                     </button>
                   )}
+                  {r.reviewed && (
+                    <button onClick={() => deleteReport(r.id)}
+                      style={{ padding:"6px 12px", borderRadius:8, fontSize:12, fontWeight:700,
+                        border:"1px solid #252530", background:"none", color:"#6B6878", cursor:"pointer" }}>
+                      Delete record
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
-           );
+            );
           })}
         </>)}
 
