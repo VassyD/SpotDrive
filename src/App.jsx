@@ -1303,10 +1303,14 @@ function AdminPanel({ onClose }) {
     let query = supabase
       .from("reports")
       .select(`
-        id, reason, created_at, reviewed,
+        id, reason, created_at, reviewed, spot_id, comment_id, reported_user_id,
         reporter:profiles!reports_reporter_id_fkey(handle),
         spot:spots(id, make, model, image_url, status, report_count,
-          owner:profiles!spots_user_id_fkey(handle))
+          owner:profiles!spots_user_id_fkey(handle)),
+        comment:comments(id, text, spot_id,
+          author:profiles!comments_user_id_fkey(handle),
+          spot:spots(id, make, model)),
+        reported_user:profiles!reports_reported_user_id_fkey(id, handle, is_banned, is_shadow_banned, suspended_until)
       `)
       .order("created_at", { ascending: false });
     if (filter === "pending") query = query.eq("reviewed", false);
@@ -1335,6 +1339,12 @@ const removeSpot = async (spotId, reportId) => {
     await markReviewed(reportId);
   };
 
+  const deleteComment = async (commentId, reportId) => {
+    if (!window.confirm("Permanently delete this comment?")) return;
+    const { error } = await supabase.from("comments").delete().eq("id", commentId);
+    if (error) { console.error(error); return; }
+    await markReviewed(reportId);
+  };
 const loadOffenders = useCallback(async () => {
     setLoadingUsers(true);
     const { data, error } = await supabase
@@ -1473,39 +1483,95 @@ const loadOffenders = useCallback(async () => {
               No {filter === "pending" ? "pending" : ""} reports.
             </div>
           )}
-          {!loading && reports.map(r => (
+          {!loading && reports.map(r => {
+            const type = r.spot_id ? "spot" : r.comment_id ? "comment" : "user";
+            return (
             <div key={r.id} style={{ background:"#14141A", border:"1px solid #252530",
               borderRadius:12, padding:14, marginBottom:10, display:"flex", gap:12 }}>
-              <img src={imgUrl(r.spot?.image_url, 100)} alt=""
-                style={{ width:60, height:60, borderRadius:8, objectFit:"cover", flexShrink:0 }} />
+              {type === "spot" && (
+                <img src={imgUrl(r.spot?.image_url, 100)} alt=""
+                  style={{ width:60, height:60, borderRadius:8, objectFit:"cover", flexShrink:0 }} />
+              )}
               <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:14, fontWeight:700, color:"#F2EEE8" }}>
-                  {r.spot?.make} {r.spot?.model}
+                <div style={{ fontSize:10, fontWeight:700, color:"#6B6878", textTransform:"uppercase",
+                  letterSpacing:".05em", marginBottom:4 }}>
+                  {type === "spot" ? "Spot report" : type === "comment" ? "Comment report" : "User report"}
                 </div>
-                <div style={{ fontSize:12, color:"#6B6878", marginTop:2 }}>
-                  Owner: @{r.spot?.owner?.handle || "unknown"} · Status: {r.spot?.status}
-                  {r.spot?.report_count > 0 && ` · ${r.spot.report_count} total reports`}
-                </div>
+
+                {type === "spot" && (<>
+                  <div style={{ fontSize:14, fontWeight:700, color:"#F2EEE8" }}>
+                    {r.spot?.make} {r.spot?.model}
+                  </div>
+                  <div style={{ fontSize:12, color:"#6B6878", marginTop:2 }}>
+                    Owner: @{r.spot?.owner?.handle || "unknown"} · Status: {r.spot?.status}
+                    {r.spot?.report_count > 0 && ` · ${r.spot.report_count} total reports`}
+                  </div>
+                </>)}
+
+                {type === "comment" && (<>
+                  <div style={{ fontSize:14, fontWeight:700, color:"#F2EEE8" }}>
+                    Comment by @{r.comment?.author?.handle || "unknown"}
+                  </div>
+                  <div style={{ fontSize:13, color:"#AAA6A0", marginTop:4, fontStyle:"italic" }}>
+                    "{r.comment?.text || "(comment deleted)"}"
+                  </div>
+                  <div style={{ fontSize:12, color:"#6B6878", marginTop:2 }}>
+                    On: {r.comment?.spot?.make} {r.comment?.spot?.model}
+                  </div>
+                </>)}
+
+                {type === "user" && (<>
+                  <div style={{ fontSize:14, fontWeight:700, color:"#F2EEE8" }}>
+                    @{r.reported_user?.handle || "unknown"}
+                  </div>
+                  <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:4 }}>
+                    {r.reported_user?.is_banned && <span style={{ fontSize:10, fontWeight:700, color:"#EF4444", background:"rgba(239,68,68,.12)", padding:"2px 8px", borderRadius:6 }}>BANNED</span>}
+                    {r.reported_user?.is_shadow_banned && <span style={{ fontSize:10, fontWeight:700, color:"#C9A84C", background:"rgba(201,168,76,.12)", padding:"2px 8px", borderRadius:6 }}>SHADOW-BANNED</span>}
+                  </div>
+                </>)}
+
                 <div style={{ fontSize:13, color:"#F2EEE8", marginTop:6 }}>
                   <strong>Reason:</strong> {r.reason}
                 </div>
                 <div style={{ fontSize:11, color:"#6B6878", marginTop:2 }}>
                   Reported by @{r.reporter?.handle || "unknown"} · {timeAgo(r.created_at)}
                 </div>
-               <div style={{ display:"flex", gap:8, marginTop:10 }}>
-                  {r.spot?.status === "hidden" ? (
-                    <button onClick={() => unhideSpot(r.spot.id, r.id)}
-                      style={{ padding:"6px 12px", borderRadius:8, fontSize:12, fontWeight:700,
-                        border:"1px solid #22C55E", background:"none", color:"#22C55E", cursor:"pointer" }}>
-                      Un-hide spot
-                    </button>
-                  ) : (
-                    <button onClick={() => removeSpot(r.spot.id, r.id)}
+
+                <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginTop:10 }}>
+                  {type === "spot" && (
+                    r.spot?.status === "hidden" ? (
+                      <button onClick={() => unhideSpot(r.spot.id, r.id)}
+                        style={{ padding:"6px 12px", borderRadius:8, fontSize:12, fontWeight:700,
+                          border:"1px solid #22C55E", background:"none", color:"#22C55E", cursor:"pointer" }}>
+                        Un-hide spot
+                      </button>
+                    ) : (
+                      <button onClick={() => removeSpot(r.spot.id, r.id)}
+                        style={{ padding:"6px 12px", borderRadius:8, fontSize:12, fontWeight:700,
+                          border:"1px solid #EF4444", background:"none", color:"#EF4444", cursor:"pointer" }}>
+                        Remove spot
+                      </button>
+                    )
+                  )}
+                  {type === "comment" && (
+                    <button onClick={() => deleteComment(r.comment_id, r.id)}
                       style={{ padding:"6px 12px", borderRadius:8, fontSize:12, fontWeight:700,
                         border:"1px solid #EF4444", background:"none", color:"#EF4444", cursor:"pointer" }}>
-                      Remove spot
+                      Delete comment
                     </button>
                   )}
+                  {type === "user" && r.reported_user && (<>
+                    <button onClick={() => toggleBan(r.reported_user)}
+                      style={{ padding:"6px 12px", borderRadius:8, fontSize:12, fontWeight:700,
+                        border:"1px solid #EF4444", background:"none", color:"#EF4444", cursor:"pointer" }}>
+                      {r.reported_user.is_banned ? "Unban" : "Ban"}
+                    </button>
+                    <button onClick={() => toggleShadowBan(r.reported_user)}
+                      style={{ padding:"6px 12px", borderRadius:8, fontSize:12, fontWeight:700,
+                        border:"1px solid #C9A84C", background:"none", color:"#C9A84C", cursor:"pointer" }}>
+                      {r.reported_user.is_shadow_banned ? "Un-shadow-ban" : "Shadow-ban"}
+                    </button>
+                  </>)}
                   {!r.reviewed && (
                     <button onClick={() => markReviewed(r.id)}
                       style={{ padding:"6px 12px", borderRadius:8, fontSize:12, fontWeight:700,
@@ -1516,7 +1582,8 @@ const loadOffenders = useCallback(async () => {
                 </div>
               </div>
             </div>
-          ))}
+           );
+          })}
         </>)}
 
         {section === "users" && (<>
