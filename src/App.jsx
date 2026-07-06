@@ -743,7 +743,7 @@ function UploadModal({ onClose }) {
 
 
 // ─── SETTINGS SHEET ───────────────────────────────────────────
-function SettingsSheet({ onClose, onEditProfile, onChangePhoto, onPrivacy, onNotifications }) {
+function SettingsSheet({ onClose, onEditProfile, onChangePhoto, onPrivacy, onNotifications, onOpenAdmin }) {
   const { user, profile, signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
 
@@ -773,6 +773,7 @@ function SettingsSheet({ onClose, onEditProfile, onChangePhoto, onPrivacy, onNot
           { icon:"📸", label:"Change Photo",   action:() => { onClose(); onChangePhoto(); } },
           { icon:"🔔", label:"Notifications", action:() => { onClose(); onNotifications(); } },
           { icon:"🔒", label:"Privacy",        action:() => { onClose(); onPrivacy(); } },
+          ...(profile?.is_admin ? [{ icon:"🛡️", label:"Reports (Admin)", action:() => { onClose(); onOpenAdmin(); } }] : []),
         ].map(({ icon, label, action }) => (
           <button key={label} onClick={action}
             style={{ width:"100%", display:"flex", alignItems:"center", gap:12, padding:14,
@@ -1275,6 +1276,147 @@ function EditProfileSheet({ onClose }) {
     </div>
   );
 }
+
+// ─── ADMIN PANEL ─────────────────────────────────────────────────────────
+function AdminPanel({ onClose }) {
+  const { profile } = useAuth();
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("pending");
+
+  const timeAgo = (ts) => {
+    if (!ts) return "";
+    const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
+    if (m < 1) return "just now";
+    if (m < 60) return `${m}m ago`;
+    if (m < 1440) return `${Math.floor(m/60)}h ago`;
+    return `${Math.floor(m/1440)}d ago`;
+  };
+
+  const loadReports = useCallback(async () => {
+    setLoading(true);
+    let query = supabase
+      .from("reports")
+      .select(`
+        id, reason, created_at, reviewed,
+        reporter:profiles!reports_reporter_id_fkey(handle),
+        spot:spots(id, make, model, image_url, status, report_count,
+          owner:profiles!spots_user_id_fkey(handle))
+      `)
+      .order("created_at", { ascending: false });
+    if (filter === "pending") query = query.eq("reviewed", false);
+    const { data, error } = await query;
+    if (error) console.error("Failed to load reports:", error);
+    setReports(data || []);
+    setLoading(false);
+  }, [filter]);
+
+  useEffect(() => { loadReports(); }, [loadReports]);
+
+  const markReviewed = async (reportId) => {
+    const { error } = await supabase.from("reports").update({ reviewed: true }).eq("id", reportId);
+    if (error) { console.error(error); return; }
+    setReports(prev => prev.filter(r => r.id !== reportId));
+  };
+
+  const unhideSpot = async (spotId, reportId) => {
+    const { error } = await supabase.from("spots").update({ status: "live" }).eq("id", spotId);
+    if (error) { console.error(error); return; }
+    await markReviewed(reportId);
+  };
+const removeSpot = async (spotId, reportId) => {
+    const { error } = await supabase.from("spots").update({ status: "hidden" }).eq("id", spotId);
+    if (error) { console.error(error); return; }
+    await markReviewed(reportId);
+  };
+
+  if (!profile?.is_admin) return null;
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.85)", zIndex:800,
+      display:"flex", alignItems:"flex-end", justifyContent:"center" }}
+      onClick={e => { if (e.target===e.currentTarget) onClose(); }}>
+      <div style={{ background:"#0A0A0C", width:"100%", maxWidth:430, height:"88vh",
+        borderRadius:"20px 20px 0 0", border:"1px solid #252530",
+        display:"flex", flexDirection:"column", animation:"slideUp .25s ease" }}>
+        <div style={{ padding:"14px 16px 0", flexShrink:0 }}>
+          <div style={{ width:36, height:4, borderRadius:2, background:"#252530", margin:"0 auto 14px" }} />
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:20, fontWeight:900, color:"#F2EEE8" }}>
+              Reports
+            </div>
+            <button onClick={onClose} style={{ color:"#6B6878", fontSize:22, background:"none", border:"none" }}>×</button>
+          </div>
+          <div style={{ display:"flex", gap:8, marginBottom:14 }}>
+            {["pending", "all"].map(f => (
+              <button key={f} onClick={() => setFilter(f)}
+                style={{ padding:"6px 12px", borderRadius:8, fontSize:12, fontWeight:700,
+                  cursor:"pointer", border:"1px solid #252530",
+                  background: filter===f ? "#E8430A" : "none",
+                  color: filter===f ? "#fff" : "#6B6878" }}>
+                {f === "pending" ? "Pending" : "All"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ flex:1, overflowY:"auto", padding:"0 16px 16px" }}>
+          {loading && <div style={{ display:"flex", justifyContent:"center", padding:40 }}><Spinner size={24} /></div>}
+          {!loading && reports.length === 0 && (
+            <div style={{ padding:40, textAlign:"center", color:"#6B6878", fontSize:14 }}>
+              No {filter === "pending" ? "pending" : ""} reports.
+            </div>
+          )}
+          {!loading && reports.map(r => (
+            <div key={r.id} style={{ background:"#14141A", border:"1px solid #252530",
+              borderRadius:12, padding:14, marginBottom:10, display:"flex", gap:12 }}>
+              <img src={imgUrl(r.spot?.image_url, 100)} alt=""
+                style={{ width:60, height:60, borderRadius:8, objectFit:"cover", flexShrink:0 }} />
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:14, fontWeight:700, color:"#F2EEE8" }}>
+                  {r.spot?.make} {r.spot?.model}
+                </div>
+                <div style={{ fontSize:12, color:"#6B6878", marginTop:2 }}>
+                  Owner: @{r.spot?.owner?.handle || "unknown"} · Status: {r.spot?.status}
+                  {r.spot?.report_count > 0 && ` · ${r.spot.report_count} total reports`}
+                </div>
+                <div style={{ fontSize:13, color:"#F2EEE8", marginTop:6 }}>
+                  <strong>Reason:</strong> {r.reason}
+                </div>
+                <div style={{ fontSize:11, color:"#6B6878", marginTop:2 }}>
+                  Reported by @{r.reporter?.handle || "unknown"} · {timeAgo(r.created_at)}
+                </div>
+               <div style={{ display:"flex", gap:8, marginTop:10 }}>
+                  {r.spot?.status === "hidden" ? (
+                    <button onClick={() => unhideSpot(r.spot.id, r.id)}
+                      style={{ padding:"6px 12px", borderRadius:8, fontSize:12, fontWeight:700,
+                        border:"1px solid #22C55E", background:"none", color:"#22C55E", cursor:"pointer" }}>
+                      Un-hide spot
+                    </button>
+                  ) : (
+                    <button onClick={() => removeSpot(r.spot.id, r.id)}
+                      style={{ padding:"6px 12px", borderRadius:8, fontSize:12, fontWeight:700,
+                        border:"1px solid #EF4444", background:"none", color:"#EF4444", cursor:"pointer" }}>
+                      Remove spot
+                    </button>
+                  )}
+                  {!r.reviewed && (
+                    <button onClick={() => markReviewed(r.id)}
+                      style={{ padding:"6px 12px", borderRadius:8, fontSize:12, fontWeight:700,
+                        border:"1px solid #252530", background:"none", color:"#6B6878", cursor:"pointer" }}>
+                      Dismiss
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 // ─── STORIES ──────────────────────────────────────────────────
 const MOCK_STORIES = [
@@ -2449,6 +2591,7 @@ function ProfileScreen() {
   const [showNotifSettings, setShowNotifSettings] = useState(false);
   const [uploadingPhoto,    setUploadingPhoto]    = useState(false);
   const [editingSpot,       setEditingSpot]       = useState(null);
+  const [showAdmin,         setShowAdmin]         = useState(false);
   const avatarRef = useRef(null);
 
   useEffect(() => {
@@ -2477,19 +2620,20 @@ function ProfileScreen() {
     <div>
       <input ref={avatarRef} type="file" accept="image/*" style={{ display:"none" }} onChange={handlePhotoChange} />
 
-      {showSettings && (
+     {showSettings && (
         <SettingsSheet
           onClose={() => setShowSettings(false)}
           onEditProfile={() => setShowEdit(true)}
           onChangePhoto={() => avatarRef.current?.click()}
           onPrivacy={() => setShowPrivacy(true)}
           onNotifications={() => setShowNotifSettings(true)}
+          onOpenAdmin={() => setShowAdmin(true)}
         />
       )}
-
       {showEdit          && <EditProfileSheet          onClose={() => setShowEdit(false)} />}
       {showPrivacy       && <PrivacySheet              onClose={() => setShowPrivacy(false)} />}
       {showNotifSettings && <NotificationSettingsSheet onClose={() => setShowNotifSettings(false)} />}
+      {showAdmin         && <AdminPanel                onClose={() => setShowAdmin(false)} />}
 
       <div style={{ background:"linear-gradient(180deg,#2D1200 0%,#14141A 100%)", padding:"24px 16px 0" }}>
         <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:12 }}>
