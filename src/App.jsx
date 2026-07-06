@@ -4157,7 +4157,7 @@ function LeaderboardScreen() {
 // ─── SHARE SHEET ──────────────────────────────────────────────
 function ShareSheet({ spot, onClose }) {
   const [copied, setCopied] = useState(false);
-  const shareUrl = `https://spot-drive.vercel.app/?spot=${spot.id}`;
+  const shareUrl = `${window.location.origin}/?spot=${spot.id}`;
 
   const copyLink = async () => {
     try {
