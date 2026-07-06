@@ -3622,7 +3622,7 @@ function MainApp() {
 }
 
 // ─── COMMENT ROW ─────────────────────────────────────────────
-function CommentRow({ comment: c, user, profile, timeAgo, onReply }) {
+function CommentRow({ comment: c, user, profile, timeAgo, onReply, onDelete }) {
   const [liked, setLiked] = useState(false);
   const [likes, setLikes] = useState(c.likes_count || 0);
   const [showReportMenu, setShowReportMenu] = useState(false);
@@ -3670,6 +3670,13 @@ function CommentRow({ comment: c, user, profile, timeAgo, onReply }) {
               style={{ background:"none", border:"none", cursor:"pointer",
                 color:"#6B6878", fontSize:11, fontWeight:600 }}>
               Reply
+            </button>
+          )}
+          {user && profile?.handle === c.handle && !c.optimistic && (
+            <button onClick={() => { if (window.confirm("Delete this comment?")) onDelete(c.id); }}
+              style={{ background:"none", border:"none", cursor:"pointer",
+                color:"#EF4444", fontSize:11, fontWeight:600 }}>
+              Delete
             </button>
           )}
           {user && profile?.handle !== c.handle && (
@@ -3748,6 +3755,15 @@ function CommentsSheet({ spot, onClose }) {
   useEffect(() => {
     if (!loading) setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:"smooth" }), 100);
   }, [loading]);
+
+  const deleteComment = async (commentId) => {
+    const { error } = await supabase.from("comments").delete().eq("id", commentId);
+    if (error) { console.error(error); return; }
+    setComments(cs => cs.filter(c => c.id !== commentId));
+    await supabase.from("spots")
+      .update({ comments_count: Math.max((spot.comments || 1) - 1, 0) })
+      .eq("id", spot.id);
+  };
 
   const postComment = async () => {
     if (!text.trim() || posting || !user) return;
@@ -3908,7 +3924,8 @@ function CommentsSheet({ spot, onClose }) {
           comments.map(c => (
               <CommentRow key={c.id} comment={c} user={user}
                 profile={profile} timeAgo={timeAgo}
-                onReply={(handle) => { setText(`@${handle} `); inputRef.current?.focus(); }} />
+                onReply={(handle) => { setText(`@${handle} `); inputRef.current?.focus(); }}
+                onDelete={deleteComment} />
             ))
           )}
           <div ref={bottomRef} style={{ height:8 }} />
