@@ -378,7 +378,7 @@ function ForgotForm({ onSwitch }) {
 }
 
 // ─── SPOT CARD ────────────────────────────────────────────────
-function SpotCard({ spot, onTap }) {
+function SpotCard({ spot, onTap, onLikeChange, onSaveChange }) {
   const { user } = useAuth();
   const [liked,     setLiked]     = useState(spot.liked);
   const [saved,     setSaved]     = useState(spot.saved);
@@ -390,14 +390,48 @@ function SpotCard({ spot, onTap }) {
   const [reported,  setReported]  = useState(false);
   const [reporting, setReporting] = useState(false);
 
-  const handleLike = (e) => {
+  const handleLike = async (e) => {
     e.stopPropagation();
-    const next = !liked; setLiked(next); setLikes(n => next ? n+1 : n-1);
+    if (!user) return;
+    const next = !liked;
+    setLiked(next); setLikes(n => next ? n+1 : n-1); // optimistic
     if (next) { setPop(true); setTimeout(() => setPop(false), 350); }
+    try {
+      if (next) {
+        const { error } = await supabase.from("likes").insert({ spot_id: spot.id, user_id: user.id });
+        if (error && error.code !== "23505") throw error;
+      } else {
+        const { error } = await supabase.from("likes").delete().eq("spot_id", spot.id).eq("user_id", user.id);
+        if (error) throw error;
+      }
+   } catch (err) {
+      console.error(err);
+      setLiked(!next); setLikes(n => !next ? n+1 : n-1); // revert on failure
+      onLikeChange?.(spot.id, !next, likes);
+      return;
+   }
+    onLikeChange?.(spot.id, next, next ? likes + 1 : likes - 1);
   };
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.stopPropagation();
-    const next = !saved; setSaved(next); setSaves(n => next ? n+1 : n-1);
+    if (!user) return;
+    const next = !saved;
+    setSaved(next); setSaves(n => next ? n+1 : n-1); // optimistic
+    try {
+      if (next) {
+        const { error } = await supabase.from("saves").insert({ spot_id: spot.id, user_id: user.id });
+        if (error && error.code !== "23505") throw error;
+      } else {
+        const { error } = await supabase.from("saves").delete().eq("spot_id", spot.id).eq("user_id", user.id);
+        if (error) throw error;
+      }
+   } catch (err) {
+      console.error(err);
+      setSaved(!next); setSaves(n => !next ? n+1 : n-1); // revert on failure
+      onSaveChange?.(spot.id, !next, saves);
+      return;
+    }
+    onSaveChange?.(spot.id, next, next ? saves + 1 : saves - 1);
   };
 const handleReport = async (reason) => {
   if (!user || reported || reporting) return;
@@ -2259,7 +2293,7 @@ const cachedFetch = async (key, fetcher) => {
 const PAGE_SIZE = 10;
 
 function FeedScreen({ onSpotTap }) {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const [spots,         setSpots]         = useState([]);
   const [loading,       setLoading]       = useState(true);
   const [loadingMore,   setLoadingMore]   = useState(false);
@@ -2298,6 +2332,17 @@ function FeedScreen({ onSpotTap }) {
     if (m < 1440) return `${Math.floor(m/60)}h ago`;
     return `${Math.floor(m/1440)}d ago`;
   };
+  const applyLikedSaved = async (mapped) => {
+    if (!user || mapped.length === 0) return mapped;
+    const ids = mapped.map(s => s.id);
+    const [{ data: likedRows }, { data: savedRows }] = await Promise.all([
+      supabase.from("likes").select("spot_id").eq("user_id", user.id).in("spot_id", ids),
+      supabase.from("saves").select("spot_id").eq("user_id", user.id).in("spot_id", ids),
+    ]);
+    const likedSet = new Set((likedRows || []).map(r => r.spot_id));
+    const savedSet = new Set((savedRows || []).map(r => r.spot_id));
+    return mapped.map(s => ({ ...s, liked: likedSet.has(s.id), saved: savedSet.has(s.id) }));
+  };
 
   // Initial load with cache
   useEffect(() => {
@@ -2311,8 +2356,9 @@ function FeedScreen({ onSpotTap }) {
         return data;
       });
 
-      if (data && data.length > 0) {
-        setSpots(data.map(mapSpot));
+     if (data && data.length > 0) {
+        const mapped = await applyLikedSaved(data.map(mapSpot));
+        setSpots(mapped);
         setHasMore(data.length === PAGE_SIZE);
       } else {
         setSpots(MOCK_SPOTS.map(s => ({ ...s, image: imgUrl(s.image, 600) })));
@@ -2379,14 +2425,14 @@ function FeedScreen({ onSpotTap }) {
       .order("created_at", { ascending: false })
       .range(from, to);
 
-    if (data && data.length > 0) {
-      setSpots(prev => [...prev, ...data.map(mapSpot)]);
+   if (data && data.length > 0) {
+      const mapped = await applyLikedSaved(data.map(mapSpot));
+      setSpots(prev => [...prev, ...mapped]);
       setPage(nextPage);
       setHasMore(data.length === PAGE_SIZE);
     } else {
       setHasMore(false);
     }
-    setLoadingMore(false);
   };
 
   return (
@@ -2420,7 +2466,10 @@ function FeedScreen({ onSpotTap }) {
                 </div>
               </div>
             ))
-          : spots.map(s => <SpotCard key={s.id} spot={s} onTap={onSpotTap} />)
+          : spots.map(s => <SpotCard key={s.id} spot={s} onTap={onSpotTap}
+             onLikeChange={(id, liked, likes) => setSpots(prev => prev.map(sp => sp.id === id ? { ...sp, liked, likes } : sp))}
+              onSaveChange={(id, saved, saves) => setSpots(prev => prev.map(sp => sp.id === id ? { ...sp, saved, saves } : sp))}
+            />)
         }
 
         {/* Infinite scroll trigger */}
@@ -3723,7 +3772,7 @@ function CommentsSheet({ spot, onClose }) {
   const inputRef  = useRef(null);
   const bottomRef = useRef(null);
 
-  const timeAgo = (ts) => {
+    const timeAgo = (ts) => {
     const m = Math.floor((Date.now()-new Date(ts).getTime())/60000);
     if (m<1) return "just now"; if (m<60) return `${m}m`;
     if (m<1440) return `${Math.floor(m/60)}h`; return `${Math.floor(m/1440)}d`;
@@ -3814,9 +3863,39 @@ function CommentsSheet({ spot, onClose }) {
     }
   };
 
-  const handleLike = () => {
+  const handleLike = async () => {
+    if (!user) return;
     const next = !liked;
     setLiked(next); setLikes(n => next ? n+1 : n-1);
+    try {
+      if (next) {
+        const { error } = await supabase.from("likes").insert({ spot_id: spot.id, user_id: user.id });
+        if (error && error.code !== "23505") throw error;
+      } else {
+        const { error } = await supabase.from("likes").delete().eq("spot_id", spot.id).eq("user_id", user.id);
+        if (error) throw error;
+      }
+    } catch (err) {
+      console.error(err);
+      setLiked(!next); setLikes(n => !next ? n+1 : n-1);
+    }
+  };
+  const handleSave = async () => {
+    if (!user) return;
+    const next = !saved;
+    setSaved(next);
+    try {
+      if (next) {
+        const { error } = await supabase.from("saves").insert({ spot_id: spot.id, user_id: user.id });
+        if (error && error.code !== "23505") throw error;
+      } else {
+        const { error } = await supabase.from("saves").delete().eq("spot_id", spot.id).eq("user_id", user.id);
+        if (error) throw error;
+      }
+    } catch (err) {
+      console.error(err);
+      setSaved(!next);
+    }
   };
 
   return (
@@ -3872,7 +3951,7 @@ function CommentsSheet({ spot, onClose }) {
                   fontSize:13, fontWeight:600, border:"none", background:"none", cursor:"pointer" }}>
                 💬 {comments.length}
               </button>
-              <button onClick={() => setSaved(s => !s)}
+              <button onClick={handleSave}
                 style={{ display:"flex", alignItems:"center", gap:5,
                   color:saved?"#C9A84C":"#6B6878",
                   fontSize:13, fontWeight:600, border:"none", background:"none", cursor:"pointer" }}>
