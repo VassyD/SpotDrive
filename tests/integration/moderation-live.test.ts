@@ -137,3 +137,38 @@ describe("LIVE: shadow-banned users", () => {
     expect(data?.length ?? 0).toBe(1);
   });
 });
+
+describe("LIVE: admin profile updates", () => {
+  let adminUser: { id: string; email: string };
+  let adminClient: ReturnType<typeof createClient>;
+
+  beforeAll(async () => {
+    adminUser = await createTestUser("admin");
+    adminClient = await signInAs(adminUser.email);
+    await admin.from("profiles").update({ is_admin: true }).eq("id", adminUser.id);
+  }, 15_000);
+
+  afterAll(async () => {
+    await admin.from("profiles").delete().eq("id", adminUser.id);
+    await admin.auth.admin.deleteUser(adminUser.id);
+  });
+
+  it("allows an admin to ban another user via their own authenticated session (not service role)", async () => {
+    const { error } = await adminClient.from("profiles").update({ is_banned: true }).eq("id", normalUser.id);
+    expect(error).toBeNull();
+
+    const { data } = await admin.from("profiles").select("is_banned").eq("id", normalUser.id).single();
+    expect(data?.is_banned).toBe(true);
+
+    // Reset for cleanliness
+    await admin.from("profiles").update({ is_banned: false }).eq("id", normalUser.id);
+  });
+
+  it("prevents a non-admin from updating another user's profile", async () => {
+    const { error } = await normalClient.from("profiles").update({ is_banned: true }).eq("id", shadowUser.id);
+    // RLS blocks with no matching policy → typically 0 rows affected, not
+    // necessarily an explicit error, so verify via the actual data instead.
+    const { data } = await admin.from("profiles").select("is_banned").eq("id", shadowUser.id).single();
+    expect(data?.is_banned).toBe(false);
+  });
+});
