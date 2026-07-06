@@ -1335,11 +1335,12 @@ const removeSpot = async (spotId, reportId) => {
     await markReviewed(reportId);
   };
 
-  const loadOffenders = useCallback(async () => {
+const loadOffenders = useCallback(async () => {
     setLoadingUsers(true);
     const { data, error } = await supabase
       .from("reports")
-      .select("spot:spots(user_id, owner:profiles!spots_user_id_fkey(id, handle, is_banned, is_shadow_banned, suspended_until))");
+      .select("spot:spots(user_id, owner:profiles!spots_user_id_fkey(id, handle, is_banned, is_shadow_banned, suspended_until))")
+      .eq("reviewed", false);
     if (error) { console.error(error); setLoadingUsers(false); return; }
     const counts = {};
     (data || []).forEach(r => {
@@ -1392,6 +1393,24 @@ const removeSpot = async (spotId, reportId) => {
     const { error } = await supabase.from("spots").update({ status: "hidden" }).eq("user_id", user.id).eq("status", "live");
     if (error) console.error(error);
     setActionLoading(null);
+  };
+
+  const restoreAllSpots = async (user) => {
+    setActionLoading(user.id);
+    const { error } = await supabase.from("spots").update({ status: "live" }).eq("user_id", user.id).eq("status", "hidden");
+    if (error) console.error(error);
+    setActionLoading(null);
+  };
+
+  const dismissAllReports = async (user) => {
+    setActionLoading(user.id);
+    const { data: userSpots } = await supabase.from("spots").select("id").eq("user_id", user.id);
+    const spotIds = (userSpots || []).map(s => s.id);
+    if (spotIds.length > 0) {
+      await supabase.from("reports").update({ reviewed: true }).in("spot_id", spotIds);
+    }
+    setActionLoading(null);
+    setOffenders(prev => prev.filter(u => u.id !== user.id));
   };
 
   if (!profile?.is_admin) return null;
@@ -1547,11 +1566,23 @@ const removeSpot = async (spotId, reportId) => {
                   <option value="168">7 days</option>
                   <option value="clear">Remove suspension</option>
                 </select>
-                <button disabled={actionLoading===u.id} onClick={() => hideAllSpots(u)}
+               <button disabled={actionLoading===u.id} onClick={() => hideAllSpots(u)}
                   style={{ padding:"5px 10px", borderRadius:8, fontSize:11, fontWeight:700, cursor:"pointer",
                     border:"1px solid #252530", background:"none", color:"#6B6878" }}>
                   Hide all spots
                 </button>
+                <button disabled={actionLoading===u.id} onClick={() => restoreAllSpots(u)}
+                  style={{ padding:"5px 10px", borderRadius:8, fontSize:11, fontWeight:700, cursor:"pointer",
+                    border:"1px solid #22C55E", background:"none", color:"#22C55E" }}>
+                  Restore all spots
+                </button>
+                {u.reportCount != null && (
+                  <button disabled={actionLoading===u.id} onClick={() => dismissAllReports(u)}
+                    style={{ padding:"5px 10px", borderRadius:8, fontSize:11, fontWeight:700, cursor:"pointer",
+                      border:"1px solid #22C55E", background:"none", color:"#22C55E" }}>
+                    Clear reports (not an issue)
+                  </button>
+                )}
               </div>
             </div>
           ))}
