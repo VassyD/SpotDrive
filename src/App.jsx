@@ -1283,6 +1283,11 @@ function AdminPanel({ onClose }) {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("pending");
+  const [section, setSection] = useState("reports"); // "reports" | "users"
+  const [userQuery, setUserQuery] = useState("");
+  const [offenders, setOffenders] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [actionLoading, setActionLoading] = useState(null);
 
   const timeAgo = (ts) => {
     if (!ts) return "";
@@ -1330,6 +1335,65 @@ const removeSpot = async (spotId, reportId) => {
     await markReviewed(reportId);
   };
 
+  const loadOffenders = useCallback(async () => {
+    setLoadingUsers(true);
+    const { data, error } = await supabase
+      .from("reports")
+      .select("spot:spots(user_id, owner:profiles!spots_user_id_fkey(id, handle, is_banned, is_shadow_banned, suspended_until))");
+    if (error) { console.error(error); setLoadingUsers(false); return; }
+    const counts = {};
+    (data || []).forEach(r => {
+      const owner = r.spot?.owner;
+      if (!owner) return;
+      if (!counts[owner.id]) counts[owner.id] = { ...owner, reportCount: 0 };
+      counts[owner.id].reportCount += 1;
+    });
+    setOffenders(Object.values(counts).sort((a, b) => b.reportCount - a.reportCount));
+    setLoadingUsers(false);
+  }, []);
+
+  const searchUsers = async (q) => {
+    if (!q.trim()) { loadOffenders(); return; }
+    setLoadingUsers(true);
+    const { data } = await supabase.from("profiles")
+      .select("id, handle, is_banned, is_shadow_banned, suspended_until")
+      .ilike("handle", `%${q.trim()}%`).limit(20);
+    setOffenders((data || []).map(u => ({ ...u, reportCount: null })));
+    setLoadingUsers(false);
+  };
+
+  useEffect(() => { if (section === "users") loadOffenders(); }, [section, loadOffenders]);
+
+  const toggleBan = async (user) => {
+    setActionLoading(user.id);
+    const { error } = await supabase.from("profiles").update({ is_banned: !user.is_banned }).eq("id", user.id);
+    if (!error) setOffenders(prev => prev.map(u => u.id === user.id ? { ...u, is_banned: !u.is_banned } : u));
+    setActionLoading(null);
+  };
+
+  const toggleShadowBan = async (user) => {
+    setActionLoading(user.id);
+    const { error } = await supabase.from("profiles").update({ is_shadow_banned: !user.is_shadow_banned }).eq("id", user.id);
+    if (!error) setOffenders(prev => prev.map(u => u.id === user.id ? { ...u, is_shadow_banned: !u.is_shadow_banned } : u));
+    setActionLoading(null);
+  };
+
+  const suspendUser = async (user, hours) => {
+    setActionLoading(user.id);
+    const until = hours ? new Date(Date.now() + hours * 3600000).toISOString() : null;
+    const { error } = await supabase.from("profiles").update({ suspended_until: until }).eq("id", user.id);
+    if (!error) setOffenders(prev => prev.map(u => u.id === user.id ? { ...u, suspended_until: until } : u));
+    setActionLoading(null);
+  };
+
+  const hideAllSpots = async (user) => {
+    if (!window.confirm(`Hide all live spots posted by @${user.handle}?`)) return;
+    setActionLoading(user.id);
+    const { error } = await supabase.from("spots").update({ status: "hidden" }).eq("user_id", user.id).eq("status", "live");
+    if (error) console.error(error);
+    setActionLoading(null);
+  };
+
   if (!profile?.is_admin) return null;
 
   return (
@@ -1343,24 +1407,47 @@ const removeSpot = async (spotId, reportId) => {
           <div style={{ width:36, height:4, borderRadius:2, background:"#252530", margin:"0 auto 14px" }} />
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
             <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:20, fontWeight:900, color:"#F2EEE8" }}>
-              Reports
+              Admin
             </div>
             <button onClick={onClose} style={{ color:"#6B6878", fontSize:22, background:"none", border:"none" }}>×</button>
           </div>
-          <div style={{ display:"flex", gap:8, marginBottom:14 }}>
-            {["pending", "all"].map(f => (
-              <button key={f} onClick={() => setFilter(f)}
-                style={{ padding:"6px 12px", borderRadius:8, fontSize:12, fontWeight:700,
-                  cursor:"pointer", border:"1px solid #252530",
-                  background: filter===f ? "#E8430A" : "none",
-                  color: filter===f ? "#fff" : "#6B6878" }}>
-                {f === "pending" ? "Pending" : "All"}
+          <div style={{ display:"flex", gap:8, marginBottom:10 }}>
+            {[["reports","Reports"],["users","Users"]].map(([key,label]) => (
+              <button key={key} onClick={() => setSection(key)}
+                style={{ flex:1, padding:"8px", borderRadius:8, fontSize:13, fontWeight:700,
+                  cursor:"pointer", border:`1px solid ${section===key?"#E8430A":"#252530"}`,
+                  background: section===key ? "#2D1200" : "none",
+                  color: section===key ? "#E8430A" : "#6B6878" }}>
+                {label}
               </button>
             ))}
           </div>
+          {section === "reports" && (
+            <div style={{ display:"flex", gap:8, marginBottom:14 }}>
+              {["pending", "all"].map(f => (
+                <button key={f} onClick={() => setFilter(f)}
+                  style={{ padding:"6px 12px", borderRadius:8, fontSize:12, fontWeight:700,
+                    cursor:"pointer", border:"1px solid #252530",
+                    background: filter===f ? "#E8430A" : "none",
+                    color: filter===f ? "#fff" : "#6B6878" }}>
+                  {f === "pending" ? "Pending" : "All"}
+                </button>
+              ))}
+            </div>
+          )}
+          {section === "users" && (
+            <div style={{ marginBottom:14 }}>
+              <input value={userQuery}
+                onChange={e => { setUserQuery(e.target.value); searchUsers(e.target.value); }}
+                placeholder="Search by handle…"
+                style={{ width:"100%", background:"#18181F", border:"1px solid #252530",
+                  borderRadius:8, padding:"8px 12px", color:"#F2EEE8", fontSize:13 }} />
+            </div>
+          )}
         </div>
 
         <div style={{ flex:1, overflowY:"auto", padding:"0 16px 16px" }}>
+        {section === "reports" && (<>
           {loading && <div style={{ display:"flex", justifyContent:"center", padding:40 }}><Spinner size={24} /></div>}
           {!loading && reports.length === 0 && (
             <div style={{ padding:40, textAlign:"center", color:"#6B6878", fontSize:14 }}>
@@ -1411,6 +1498,64 @@ const removeSpot = async (spotId, reportId) => {
               </div>
             </div>
           ))}
+        </>)}
+
+        {section === "users" && (<>
+          {loadingUsers && <div style={{ display:"flex", justifyContent:"center", padding:40 }}><Spinner size={24} /></div>}
+          {!loadingUsers && offenders.length === 0 && (
+            <div style={{ padding:40, textAlign:"center", color:"#6B6878", fontSize:14 }}>
+              {userQuery ? "No users found." : "No reports yet — nothing to show here."}
+            </div>
+          )}
+          {!loadingUsers && offenders.map(u => (
+            <div key={u.id} style={{ background:"#14141A", border:"1px solid #252530",
+              borderRadius:12, padding:14, marginBottom:10 }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <div style={{ fontSize:14, fontWeight:700, color:"#F2EEE8" }}>@{u.handle}</div>
+                {u.reportCount != null && (
+                  <div style={{ fontSize:11, color:"#6B6878" }}>{u.reportCount} report{u.reportCount!==1?"s":""} received</div>
+                )}
+              </div>
+              <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:6 }}>
+                {u.is_banned && <span style={{ fontSize:10, fontWeight:700, color:"#EF4444", background:"rgba(239,68,68,.12)", padding:"2px 8px", borderRadius:6 }}>BANNED</span>}
+                {u.is_shadow_banned && <span style={{ fontSize:10, fontWeight:700, color:"#C9A84C", background:"rgba(201,168,76,.12)", padding:"2px 8px", borderRadius:6 }}>SHADOW-BANNED</span>}
+                {u.suspended_until && new Date(u.suspended_until) > new Date() && (
+                  <span style={{ fontSize:10, fontWeight:700, color:"#3B82F6", background:"rgba(59,130,246,.12)", padding:"2px 8px", borderRadius:6 }}>
+                    SUSPENDED until {new Date(u.suspended_until).toLocaleString()}
+                  </span>
+                )}
+              </div>
+              <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:10 }}>
+                <button disabled={actionLoading===u.id} onClick={() => toggleBan(u)}
+                  style={{ padding:"5px 10px", borderRadius:8, fontSize:11, fontWeight:700, cursor:"pointer",
+                    border:"1px solid #EF4444", background:"none", color:"#EF4444" }}>
+                  {u.is_banned ? "Unban" : "Ban"}
+                </button>
+                <button disabled={actionLoading===u.id} onClick={() => toggleShadowBan(u)}
+                  style={{ padding:"5px 10px", borderRadius:8, fontSize:11, fontWeight:700, cursor:"pointer",
+                    border:"1px solid #C9A84C", background:"none", color:"#C9A84C" }}>
+                  {u.is_shadow_banned ? "Un-shadow-ban" : "Shadow-ban"}
+                </button>
+                <select disabled={actionLoading===u.id}
+                  value=""
+                  onChange={e => { const v = e.target.value; if (!v) return; suspendUser(u, v === "clear" ? null : Number(v)); e.target.value = ""; }}
+                  style={{ padding:"5px 10px", borderRadius:8, fontSize:11, fontWeight:700, cursor:"pointer",
+                    border:"1px solid #3B82F6", background:"#0A0A0C", color:"#3B82F6" }}>
+                  <option value="">Suspend…</option>
+                  <option value="24">1 day</option>
+                  <option value="72">3 days</option>
+                  <option value="168">7 days</option>
+                  <option value="clear">Remove suspension</option>
+                </select>
+                <button disabled={actionLoading===u.id} onClick={() => hideAllSpots(u)}
+                  style={{ padding:"5px 10px", borderRadius:8, fontSize:11, fontWeight:700, cursor:"pointer",
+                    border:"1px solid #252530", background:"none", color:"#6B6878" }}>
+                  Hide all spots
+                </button>
+              </div>
+            </div>
+          ))}
+        </>)}
         </div>
       </div>
     </div>
