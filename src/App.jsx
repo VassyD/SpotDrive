@@ -2509,37 +2509,22 @@ function FollowButton({ targetUserId, targetHandle, size="md" }) {
       .then(({ data }) => setFollowing(!!data));
   }, [user, targetUserId]);
 
-  const toggle = async (e) => {
+ const toggle = async (e) => {
     e.stopPropagation();
     if (!user || processing || user.id === targetUserId) return;
     setProcessing(true);
     try {
       if (following) {
-        await supabase.from("follows")
+        // The on_follow_change DB trigger handles followers_count/
+        // following_count atomically — no manual count updates needed.
+        const { error } = await supabase.from("follows")
           .delete().eq("follower_id", user.id).eq("following_id", targetUserId);
-        // Decrement counts
-        await supabase.rpc("decrement_follow_counts", {
-          follower: user.id, following: targetUserId
-        }).catch(() => {
-          // Fallback: manual update if RPC not set up
-          supabase.from("profiles").select("followers_count").eq("id", targetUserId).single()
-            .then(({ data }) => {
-              if (data) supabase.from("profiles")
-                .update({ followers_count: Math.max(0, (data.followers_count||1)-1) })
-                .eq("id", targetUserId);
-            });
-        });
+        if (error) throw error;
         setFollowing(false);
       } else {
-        await supabase.from("follows")
+        const { error } = await supabase.from("follows")
           .insert({ follower_id: user.id, following_id: targetUserId });
-        // Increment counts
-        await supabase.from("profiles").select("followers_count").eq("id", targetUserId).single()
-          .then(({ data }) => {
-            if (data) supabase.from("profiles")
-              .update({ followers_count: (data.followers_count||0)+1 })
-              .eq("id", targetUserId);
-          });
+        if (error) throw error;
         setFollowing(true);
       }
     } catch(err) { console.error(err); }
@@ -3090,46 +3075,37 @@ function NotificationsScreen() {
 
   useEffect(() => {
     if (!user) return;
-    // Load from Supabase if table exists, otherwise use mock data
     const load = async () => {
       const { data, error } = await supabase
         .from("notifications")
-        .select("*")
+        .select("*, actor:profiles!notifications_actor_id_fkey(handle, avatar_url), spot:spots(make, model)")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(50);
-
-      if (data && data.length > 0) {
-        setNotifs(data);
-      } else {
-        // Rich mock notifications
-        setNotifs([
-          { id:"n1", type:"like",    read:false, created_at: new Date(Date.now()-2*60000).toISOString(),
-            actor_handle:"euro_spotter", actor_initials:"LM",
-            text:"liked your Lamborghini Huracán STO spot", spot_make:"Lamborghini", spot_model:"Huracán STO" },
-          { id:"n2", type:"follow",  read:false, created_at: new Date(Date.now()-15*60000).toISOString(),
-            actor_handle:"jdm_tokyo", actor_initials:"KT",
-            text:"started following you", spot_make:null },
-          { id:"n3", type:"comment", read:false, created_at: new Date(Date.now()-45*60000).toISOString(),
-            actor_handle:"gulf_spots", actor_initials:"OR",
-            text:"commented on your spot: \"Absolute legend catch 🔥\"", spot_make:"Lamborghini", spot_model:"Huracán STO" },
-          { id:"n4", type:"like",    read:true,  created_at: new Date(Date.now()-2*3600000).toISOString(),
-            actor_handle:"la_spotter", actor_initials:"MW",
-            text:"liked your Ferrari SF90 spot", spot_make:"Ferrari", spot_model:"SF90" },
-          { id:"n5", type:"save",    read:true,  created_at: new Date(Date.now()-3*3600000).toISOString(),
-            actor_handle:"apex_hunter", actor_initials:"AH",
-            text:"saved your Bugatti Chiron spot", spot_make:"Bugatti", spot_model:"Chiron" },
-          { id:"n6", type:"follow",  read:true,  created_at: new Date(Date.now()-5*3600000).toISOString(),
-            actor_handle:"nring_nut", actor_initials:"HF",
-            text:"started following you", spot_make:null },
-          { id:"n7", type:"like",    read:true,  created_at: new Date(Date.now()-24*3600000).toISOString(),
-            actor_handle:"euro_spotter", actor_initials:"LM",
-            text:"liked your McLaren P1 spot", spot_make:"McLaren", spot_model:"P1" },
-          { id:"n8", type:"comment", read:true,  created_at: new Date(Date.now()-2*24*3600000).toISOString(),
-            actor_handle:"jdm_tokyo", actor_initials:"KT",
-            text:"commented: \"Never seen one in person, incredible\"", spot_make:"Pagani", spot_model:"Huayra" },
-        ]);
-      }
+      if (error) console.error(error);
+      const mapped = (data || []).map(n => {
+        const handle = n.actor?.handle || "spotter";
+        let text;
+        switch (n.type) {
+          case "like":    text = `liked your ${n.spot?.make || ""} ${n.spot?.model || ""} spot`.trim(); break;
+          case "save":    text = `saved your ${n.spot?.make || ""} ${n.spot?.model || ""} spot`.trim(); break;
+          case "comment": text = `commented on your spot: "${n.comment_text || ""}"`; break;
+          case "follow":  text = "started following you"; break;
+          default:        text = "";
+        }
+        return {
+          id: n.id,
+          type: n.type,
+          read: n.read,
+          created_at: n.created_at,
+          actor_handle: handle,
+          actor_initials: handle.slice(0, 2).toUpperCase(),
+          text,
+          spot_make: n.spot?.make || null,
+          spot_model: n.spot?.model || null,
+        };
+      });
+      setNotifs(mapped);
       setLoading(false);
     };
     load();
@@ -3143,8 +3119,14 @@ function NotificationsScreen() {
     return `${Math.floor(m/1440)}d`;
   };
 
-  const markAllRead = () => setNotifs(ns => ns.map(n => ({ ...n, read:true })));
-  const markRead    = (id) => setNotifs(ns => ns.map(n => n.id===id ? {...n, read:true} : n));
+  const markAllRead = async () => {
+    setNotifs(ns => ns.map(n => ({ ...n, read:true })));
+    if (user) await supabase.from("notifications").update({ read:true }).eq("user_id", user.id).eq("read", false);
+  };
+  const markRead = async (id) => {
+    setNotifs(ns => ns.map(n => n.id===id ? {...n, read:true} : n));
+    await supabase.from("notifications").update({ read:true }).eq("id", id);
+  };
 
   const TYPE_CONFIG = {
     like:    { icon:"❤️", color:"#E8430A", label:"Likes"    },
@@ -3321,25 +3303,12 @@ function SearchScreen() {
         .or(`handle.ilike.%${clean}%,display_name.ilike.%${clean}%`)
         .limit(20);
 
-      if (data && data.length > 0) {
-        setResults(data.map(p => ({
+     setResults(
+        (data || []).map(p => ({
           ...p,
           initials: (p.handle || "SP").slice(0,2).toUpperCase(),
-        })));
-      } else {
-        // Fall back to mock filtered data
-        const mock = [
-          { id:"m1", handle:"jdm_tokyo",    display_name:"Kenji Tanaka",   followers_count:91000, spots_count:1204, initials:"KT" },
-          { id:"m2", handle:"euro_spotter", display_name:"Lena Müller",    followers_count:54200, spots_count:889,  initials:"LM" },
-          { id:"m3", handle:"gulf_spots",   display_name:"Omar Al-Rashid", followers_count:38700, spots_count:567,  initials:"OR" },
-          { id:"m4", handle:"apex_hunter",  display_name:"Tyler Rhodes",   followers_count:18400, spots_count:412,  initials:"AH" },
-          { id:"m5", handle:"la_spotter",   display_name:"Marcus Webb",    followers_count:12100, spots_count:203,  initials:"MW" },
-          { id:"m6", handle:"nring_nut",    display_name:"Hans Fischer",   followers_count:8300,  spots_count:145,  initials:"HF" },
-        ];
-        setResults(mock.filter(p =>
-          p.handle.includes(clean) || p.display_name.toLowerCase().includes(clean)
-        ));
-      }
+        }))
+      );
     } catch(e) { console.error(e); }
     finally { setLoading(false); }
   };
