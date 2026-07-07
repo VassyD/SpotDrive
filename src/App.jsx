@@ -83,7 +83,7 @@ function AuthProvider({ children }) {
   }, [fetchProfile]);
 
   const signUp = useCallback(async ({ email, password, handle, displayName }) => {
-    const { data: existing } = await supabase.from("profiles").select("handle").eq("handle", handle.toLowerCase()).single();
+     const { data: existing } = await supabase.from("profiles").select("handle").eq("handle", handle.toLowerCase()).maybeSingle();
     if (existing) throw new Error("That handle is already taken.");
     const { data, error } = await supabase.auth.signUp({
       email, password,
@@ -2505,7 +2505,7 @@ function FollowButton({ targetUserId, targetHandle, size="md" }) {
   useEffect(() => {
     if (!user || !targetUserId || user.id === targetUserId) return;
     supabase.from("follows")
-      .select("id").eq("follower_id", user.id).eq("following_id", targetUserId).single()
+      .select("id").eq("follower_id", user.id).eq("following_id", targetUserId).maybeSingle()
       .then(({ data }) => setFollowing(!!data));
   }, [user, targetUserId]);
 
@@ -2581,7 +2581,7 @@ function SpotterProfileSheet({ handle, onClose }) {
     if (!handle) return;
     const load = async () => {
       const { data: profileData } = await supabase
-        .from("profiles").select("*").eq("handle", handle).single();
+        .from("profiles").select("*").eq("handle", handle).maybeSingle();
       setSpotter(profileData);
 
       if (profileData) {
