@@ -109,11 +109,16 @@ describe("LIVE: reports table", () => {
     expect(error).not.toBeNull(); // unique constraint violation
   });
 
-  it("prevents regular users from reading report contents (no SELECT policy)", async () => {
-    const { data, error } = await clientA.from("reports").select("*").eq("spot_id", spotId);
-    // RLS with no SELECT policy returns an empty set, not an error
-    expect(error).toBeNull();
-    expect(data?.length ?? 0).toBe(0);
+  it("allows a user to see only their own submitted reports, not others'", async () => {
+    const { data: ownData, error: ownError } = await clientA.from("reports").select("*").eq("spot_id", spotId);
+    expect(ownError).toBeNull();
+    expect(ownData?.length ?? 0).toBe(1);
+    expect(ownData?.[0].reporter_id).toBe(reporterA.id);
+
+    // reporterB hasn't reported this spot, so they should see nothing for it
+    const { data: otherData, error: otherError } = await clientB.from("reports").select("*").eq("spot_id", spotId);
+    expect(otherError).toBeNull();
+    expect(otherData?.length ?? 0).toBe(0);
   });
 
   it("atomically recomputes report_count via trigger, and auto-hides at 5 reports", async () => {
