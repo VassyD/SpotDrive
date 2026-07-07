@@ -1113,7 +1113,36 @@ function PrivacySheet({ onClose }) {
       alert("Something went wrong exporting your data. Please try again.");
     }
   };
+const handleDeleteAccount = async () => {
+    if (!window.confirm(
+      "This will PERMANENTLY delete your account, all your spots, comments, and data. This cannot be undone. Are you absolutely sure?"
+    )) return;
+    // Second confirmation for an action this destructive
+    if (!window.confirm("Really delete your account? Type OK to confirm one final time.")) return;
 
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { alert("You must be signed in to delete your account."); return; }
+
+      const res = await fetch(`${supabase.supabaseUrl}/functions/v1/delete-account`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const result = await res.json();
+
+      if (!res.ok || !result.success) {
+        alert(`Failed to delete account: ${result.error || "Unknown error"}`);
+        return;
+      }
+
+      alert("Your account has been permanently deleted.");
+      await supabase.auth.signOut();
+      window.location.href = "/";
+    } catch (err) {
+      console.error(err);
+      alert("Something went wrong deleting your account. Please try again or contact support.");
+    }
+  };
   // Load saved privacy settings from profile metadata
   const [settings, setSettings] = useState({
     privateAccount:     profile?.is_private       ?? false,
@@ -1253,7 +1282,7 @@ function PrivacySheet({ onClose }) {
             </div>
             {[
               { icon:"📥", label:"Download My Data",   desc:"Get a copy of all your spots and account data.", color:"#3B82F6",   action:handleDownloadData },
-              { icon:"🗑️", label:"Delete Account",      desc:"Permanently delete your account and all your spots.", color:"#EF4444", action:() => { if (window.confirm("Are you sure? This cannot be undone.")) alert("Account deletion requested. You will receive a confirmation email."); } },
+              { icon:"🗑️", label:"Delete Account",      desc:"Permanently delete your account and all your spots.", color:"#EF4444", action:handleDeleteAccount },
             ].map(({ icon, label, desc, color, action }) => (
               <button key={label} onClick={action}
                 style={{ width:"100%", display:"flex", alignItems:"center", gap:12,
