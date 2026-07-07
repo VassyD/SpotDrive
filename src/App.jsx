@@ -1071,6 +1071,48 @@ function NotificationSettingsSheet({ onClose }) {
 // ─── PRIVACY SHEET ────────────────────────────────────────────
 function PrivacySheet({ onClose }) {
   const { user, profile, fetchProfile } = useAuth();
+  const handleDownloadData = async () => {
+    if (!user) return;
+    try {
+      const [profileRes, spotsRes, commentsRes, likesRes, savesRes, followersRes, followingRes, storiesRes, notifsRes, reportsRes] = await Promise.all([
+        supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
+        supabase.from("spots").select("*").eq("user_id", user.id),
+        supabase.from("comments").select("*").eq("user_id", user.id),
+        supabase.from("likes").select("*").eq("user_id", user.id),
+        supabase.from("saves").select("*").eq("user_id", user.id),
+        supabase.from("follows").select("*").eq("following_id", user.id),
+        supabase.from("follows").select("*").eq("follower_id", user.id),
+        supabase.from("stories").select("*").eq("user_id", user.id),
+        supabase.from("notifications").select("*").eq("user_id", user.id),
+        supabase.from("reports").select("*").eq("reporter_id", user.id),
+      ]);
+      const exportData = {
+        exported_at: new Date().toISOString(),
+        profile: profileRes.data,
+        spots: spotsRes.data || [],
+        comments: commentsRes.data || [],
+        likes: likesRes.data || [],
+        saves: savesRes.data || [],
+        followers: followersRes.data || [],
+        following: followingRes.data || [],
+        stories: storiesRes.data || [],
+        notifications: notifsRes.data || [],
+        reports_submitted: reportsRes.data || [],
+      };
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `spotdrive-data-export-${user.id}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("Something went wrong exporting your data. Please try again.");
+    }
+  };
 
   // Load saved privacy settings from profile metadata
   const [settings, setSettings] = useState({
@@ -1210,7 +1252,7 @@ function PrivacySheet({ onClose }) {
               Data & Account
             </div>
             {[
-              { icon:"📥", label:"Download My Data",   desc:"Get a copy of all your spots and account data.", color:"#3B82F6",   action:() => alert("Your data export will be emailed to you within 24 hours.") },
+              { icon:"📥", label:"Download My Data",   desc:"Get a copy of all your spots and account data.", color:"#3B82F6",   action:handleDownloadData },
               { icon:"🗑️", label:"Delete Account",      desc:"Permanently delete your account and all your spots.", color:"#EF4444", action:() => { if (window.confirm("Are you sure? This cannot be undone.")) alert("Account deletion requested. You will receive a confirmation email."); } },
             ].map(({ icon, label, desc, color, action }) => (
               <button key={label} onClick={action}
