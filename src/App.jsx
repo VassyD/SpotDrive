@@ -2836,43 +2836,37 @@ function ExploreScreen({ onSpotTap }) {
   const [spotters, setSpotters] = useState([]);
   const [loadingSpotters, setLoadingSpotters] = useState(false);
   const [viewProfile, setViewProfile] = useState(null);
-
-  const TRENDING_SPOTTERS = [
-    { id:"t1", handle:"jdm_tokyo",    display_name:"Kenji Tanaka",   followers_count:91000, spots_count:1204, initials:"KT", avatar_url:null, is_verified:true  },
-    { id:"t2", handle:"euro_spotter", display_name:"Lena Müller",    followers_count:54200, spots_count:889,  initials:"LM", avatar_url:null, is_verified:false },
-    { id:"t3", handle:"gulf_spots",   display_name:"Omar Al-Rashid", followers_count:38700, spots_count:567,  initials:"OR", avatar_url:null, is_verified:true  },
-    { id:"t4", handle:"apex_hunter",  display_name:"Tyler Rhodes",   followers_count:18400, spots_count:412,  initials:"AH", avatar_url:null, is_verified:false },
-    { id:"t5", handle:"la_spotter",   display_name:"Marcus Webb",    followers_count:12100, spots_count:203,  initials:"MW", avatar_url:null, is_verified:false },
-    { id:"t6", handle:"nring_nut",    display_name:"Hans Fischer",   followers_count:8300,  spots_count:145,  initials:"HF", avatar_url:null, is_verified:false },
-    { id:"t7", handle:"tokyo_drift",  display_name:"Yuki Tanaka",    followers_count:7200,  spots_count:98,   initials:"YT", avatar_url:null, is_verified:false },
-    { id:"t8", handle:"monza_mike",   display_name:"Mike Rossetti",  followers_count:6100,  spots_count:87,   initials:"MR", avatar_url:null, is_verified:false },
-    { id:"t9", handle:"hypercar_hq",  display_name:"The Hypercar HQ",followers_count:5400,  spots_count:312,  initials:"HH", avatar_url:null, is_verified:true  },
-    { id:"t10",handle:"spotking_au",  display_name:"Blake Morrison", followers_count:4800,  spots_count:76,   initials:"BM", avatar_url:null, is_verified:false },
-  ];
-
-  // Load spotters — merge real users with trending mock list
+  const [spots, setSpots] = useState([]);
+  const [loadingSpots, setLoadingSpots] = useState(true);
+  useEffect(() => {
+    if (tab !== "spots") return;
+    setLoadingSpots(true);
+    supabase.from("spots")
+      .select("*, profiles(handle, avatar_url)")
+      .eq("status", "live")
+      .order("created_at", { ascending: false })
+      .limit(60)
+      .then(({ data }) => {
+        setSpots((data || []).map(s => ({ ...s, image: imgUrl(s.image_url, 400), location: s.location_name })));
+        setLoadingSpots(false);
+      });
+  }, [tab]);
+ // Load real spotters, ranked by followers
   useEffect(() => {
     if (tab !== "spotters") return;
     setLoadingSpotters(true);
     supabase.from("profiles").select("*")
       .order("followers_count", { ascending:false }).limit(20)
       .then(({ data }) => {
-        // Always show trending spotters, append any real users who aren't already in list
-        const realHandles = new Set(TRENDING_SPOTTERS.map(s => s.handle));
-        const realExtras = (data || [])
-          .filter(p => !realHandles.has(p.handle))
-          .map(p => ({
-            ...p,
-            initials: (p.handle||"SP").slice(0,2).toUpperCase(),
-          }));
-        // Shuffle trending slightly for freshness
-        const shuffled = [...TRENDING_SPOTTERS].sort(() => Math.random() - 0.3);
-        setSpotters([...shuffled, ...realExtras]);
+        setSpotters((data || []).map(p => ({
+          ...p,
+          initials: (p.handle||"SP").slice(0,2).toUpperCase(),
+        })));
         setLoadingSpotters(false);
       });
   }, [tab]);
 
-  const filteredSpots = MOCK_SPOTS.filter(s => {
+  const filteredSpots = spots.filter(s => {
     const mq = !query || `${s.make} ${s.model} ${s.location}`.toLowerCase().includes(query.toLowerCase());
     return mq && (filter==="All" || s.rarity===filter);
   });
@@ -2916,7 +2910,13 @@ function ExploreScreen({ onSpotTap }) {
                   color:filter===f?"#E8430A":"#6B6878", whiteSpace:"nowrap", cursor:"pointer" }}>{f}</button>
             ))}
           </div>
-          {filteredSpots.length===0
+          {loadingSpots
+            ? <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                {Array(6).fill(0).map((_,i) => (
+                  <div key={i} className="shimmer" style={{ borderRadius:12, aspectRatio:"1" }} />
+                ))}
+              </div>
+            : filteredSpots.length===0
             ? <div style={{ textAlign:"center", padding:"60px 0" }}>
                 <div style={{ fontSize:40, marginBottom:12 }}>🔍</div>
                 <div style={{ fontSize:16, fontWeight:700, color:"#F2EEE8" }}>No spots found</div>
