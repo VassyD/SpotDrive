@@ -44,6 +44,8 @@ button{cursor:pointer;font-family:inherit}input,textarea{font-family:inherit;out
 .sd-btn-primary{background:linear-gradient(135deg,#E8430A,#BF360C);color:#fff}
 .sd-btn-primary:disabled{opacity:.5;cursor:not-allowed}
 .sd-btn-ghost{background:none;border:1.5px solid #252530;color:#AAA6A0}
+.no-scrollbar{scrollbar-width:none;-ms-overflow-style:none}
+.no-scrollbar::-webkit-scrollbar{display:none}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 `;
 
@@ -648,47 +650,80 @@ function ModelInput({ make, value, onChange, placeholder }) {
 // ─── UPLOAD MODAL (with autocomplete) ─────────────────────────
 function UploadModal({ onClose }) {
   const { user } = useAuth();
-  const [step,    setStep]    = useState(1);
-  const [file,    setFile]    = useState(null);
-  const [preview, setPreview] = useState(null);
+  const [step,       setStep]       = useState(1);
+  const [mediaItems, setMediaItems] = useState([]); // [{ file, previewUrl, type }]
   const [form,    setForm]    = useState({ make:"", model:"", year:"", rarity:"Exotic", location:"", desc:"" });
   const [loading, setLoading] = useState(false);
   const [done,    setDone]    = useState(false);
   const [error,   setError]   = useState("");
   const fileRef = useRef();
-  const blobRef = useRef(null);
-  useEffect(() => () => { if (blobRef.current) URL.revokeObjectURL(blobRef.current); }, []);
+  useEffect(() => () => { mediaItems.forEach(m => URL.revokeObjectURL(m.previewUrl)); }, []);
 
-  const handleFile = (f) => {
-    if (!f) return;
-    if (!f.type.startsWith("image/")) { setError("Please select an image file."); return; }
-    if (f.size > 30*1024*1024) { setError("File must be under 30 MB."); return; }
-    setError("");
-    if (blobRef.current) URL.revokeObjectURL(blobRef.current);
-    blobRef.current = URL.createObjectURL(f);
-    setFile(f); setPreview(blobRef.current); setStep(2);
+  const imageCount = mediaItems.filter(m => m.type === "image").length;
+  const videoCount = mediaItems.filter(m => m.type === "video").length;
+
+  const handleFiles = (fileList) => {
+    const incoming = Array.from(fileList || []);
+    if (incoming.length === 0) return;
+    let nextImages = imageCount, nextVideos = videoCount;
+    const accepted = [];
+    for (const f of incoming) {
+      const isImage = f.type.startsWith("image/");
+      const isVideo = f.type.startsWith("video/");
+      if (!isImage && !isVideo) { setError("Only image or video files are allowed."); continue; }
+      if (isImage && f.size > 30*1024*1024) { setError("Photos must be under 30 MB."); continue; }
+      if (isVideo && f.size > 100*1024*1024) { setError("Videos must be under 100 MB."); continue; }
+      if (isImage && nextImages >= 4) { setError("Maximum 4 photos per spot."); continue; }
+      if (isVideo && nextVideos >= 1) { setError("Only 1 video per spot."); continue; }
+      if (isImage) nextImages++; else nextVideos++;
+      accepted.push({ file: f, previewUrl: URL.createObjectURL(f), type: isImage ? "image" : "video" });
+    }
+    if (accepted.length > 0) {
+      setError("");
+      setMediaItems(prev => [...prev, ...accepted]);
+      setStep(2);
+    }
   };
 
+  const removeMedia = (idx) => {
+    setMediaItems(prev => {
+      const item = prev[idx];
+      if (item) URL.revokeObjectURL(item.previewUrl);
+      return prev.filter((_, i) => i !== idx);
+    });
+  };
   const handlePost = async () => {
     if (!form.make || !form.model) { setError("Make and model are required."); return; }
+    if (imageCount === 0) { setError("At least one photo is required."); return; }
     setLoading(true); setError("");
     try {
-      let imageUrl = null;
-      if (file) {
-        const ext  = file.name.split(".").pop();
-        const path = `spots/${user.id}/${Date.now()}.${ext}`;
-        const { error: uploadErr } = await supabase.storage.from("spot-photos").upload(path, file, { contentType:file.type });
+      const spotId = crypto.randomUUID();
+      const uploaded = [];
+      for (let i = 0; i < mediaItems.length; i++) {
+        const { file, type } = mediaItems[i];
+        const ext = file.name.split(".").pop();
+        const path = `spots/${user.id}/${spotId}/${i}.${ext}`;
+        const { error: uploadErr } = await supabase.storage.from("spot-photos").upload(path, file, { contentType: file.type });
         if (uploadErr) throw uploadErr;
         const { data: { publicUrl } } = supabase.storage.from("spot-photos").getPublicUrl(path);
-        imageUrl = publicUrl;
+        uploaded.push({ url: publicUrl, type });
       }
+      const coverImage = uploaded.find(u => u.type === "image")?.url || null;
+
       const { error: insertErr } = await supabase.from("spots").insert({
-        user_id:user.id, make:form.make, model:form.model,
+        id: spotId, user_id:user.id, make:form.make, model:form.model,
         year:parseInt(form.year)||new Date().getFullYear(),
         rarity:form.rarity, color:"", location_name:form.location,
-        description:form.desc, image_url:imageUrl, status:"live",
+        description:form.desc, image_url:coverImage, status:"live",
       });
       if (insertErr) throw insertErr;
+
+      const mediaRows = uploaded.map((u, i) => ({
+        spot_id: spotId, user_id: user.id, media_url: u.url, media_type: u.type, position: i,
+      }));
+      const { error: mediaErr } = await supabase.from("spot_media").insert(mediaRows);
+      if (mediaErr) throw mediaErr;
+
       setDone(true); setTimeout(onClose, 2000);
     } catch (err) { setError(err.message); }
     finally { setLoading(false); }
@@ -718,17 +753,40 @@ function UploadModal({ onClose }) {
             <div>
               <div onClick={() => fileRef.current?.click()}
                 style={{ border:"2px dashed #252530", borderRadius:14, padding:"48px 20px", textAlign:"center", cursor:"pointer", background:"#0A0A0C" }}
-                onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();handleFile(e.dataTransfer.files[0]);}}>
+                onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();handleFiles(e.dataTransfer.files);}}>
                 <div style={{ fontSize:36, marginBottom:10 }}>📸</div>
-                <div style={{ fontSize:15, fontWeight:700, color:"#F2EEE8", marginBottom:4 }}>Drop your photo here</div>
-                <div style={{ fontSize:12, color:"#6B6878" }}>or tap to choose · JPG, PNG, HEIC · Max 30MB</div>
-                <input ref={fileRef} type="file" accept="image/*" style={{ display:"none" }} onChange={e=>handleFile(e.target.files?.[0])} />
+                <div style={{ fontSize:15, fontWeight:700, color:"#F2EEE8", marginBottom:4 }}>Drop photos or a video here</div>
+                <div style={{ fontSize:12, color:"#6B6878" }}>or tap to choose · Up to 4 photos + 1 video · Photos max 30MB, video max 100MB</div>
+                <input ref={fileRef} type="file" accept="image/*,video/*" multiple style={{ display:"none" }} onChange={e=>handleFiles(e.target.files)} />
               </div>
               <ErrorMsg msg={error} />
             </div>
           ) : (
             <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-              {preview && <img src={preview} alt="preview" style={{ width:"100%", height:180, objectFit:"cover", borderRadius:12 }} />}
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:8 }}>
+                {mediaItems.map((m, i) => (
+                  <div key={i} style={{ position:"relative", aspectRatio:"1", borderRadius:10, overflow:"hidden", background:"#0A0A0C" }}>
+                    {m.type === "image"
+                      ? <img src={m.previewUrl} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                      : <video src={m.previewUrl} style={{ width:"100%", height:"100%", objectFit:"cover" }} muted />
+                    }
+                    <button onClick={() => removeMedia(i)}
+                      style={{ position:"absolute", top:4, right:4, width:20, height:20, borderRadius:"50%",
+                        background:"rgba(0,0,0,.7)", color:"#fff", border:"none", fontSize:12, cursor:"pointer",
+                        display:"flex", alignItems:"center", justifyContent:"center" }}>×</button>
+                    {m.type === "video" && (
+                      <div style={{ position:"absolute", bottom:4, left:4, fontSize:10, fontWeight:700,
+                        color:"#fff", background:"rgba(0,0,0,.7)", padding:"2px 6px", borderRadius:4 }}>VIDEO</div>
+                    )}
+                  </div>
+                ))}
+                {(imageCount < 4 || videoCount < 1) && (
+                  <button onClick={() => fileRef.current?.click()}
+                    style={{ aspectRatio:"1", borderRadius:10, border:"2px dashed #252530", background:"none",
+                      color:"#6B6878", fontSize:24, cursor:"pointer" }}>+</button>
+                )}
+              </div>
+              <ErrorMsg msg={error} />
 
               {/* Make — autocomplete */}
               <div>
@@ -3798,6 +3856,93 @@ function CommentRow({ comment: c, user, profile, timeAgo, onReply, onDelete }) {
 }
 
 // ─── COMMENTS SHEET ───────────────────────────────────────────
+// ─── MEDIA GALLERY (swipeable photos + video) ─────────────────
+function MediaGallery({ spotId, fallbackImage }) {
+  const [media, setMedia] = useState(null); // null = loading, [] = none
+  const [idx,   setIdx]   = useState(0);
+  const trackRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setMedia(null);
+    setIdx(0);
+    const load = async () => {
+      const { data, error } = await supabase
+        .from("spot_media")
+        .select("media_url, media_type, position")
+        .eq("spot_id", spotId)
+        .order("position", { ascending: true });
+      if (cancelled) return;
+      if (!error && data && data.length > 0) {
+        setMedia(data);
+      } else {
+        setMedia(fallbackImage ? [{ media_url: fallbackImage, media_type: "image", position: 0 }] : []);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [spotId, fallbackImage]);
+
+  const handleScroll = () => {
+    const el = trackRef.current;
+    if (!el || !el.clientWidth) return;
+    setIdx(Math.round(el.scrollLeft / el.clientWidth));
+  };
+
+  const goTo = (i) => {
+    const el = trackRef.current;
+    if (!el) return;
+    el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
+  };
+
+  if (media === null) {
+    return <div className="shimmer" style={{ width:"100%", aspectRatio:"1" }} />;
+  }
+  if (media.length === 0) {
+    return (
+      <div style={{ width:"100%", aspectRatio:"1", background:"#2D1200",
+        display:"flex", alignItems:"center", justifyContent:"center", fontSize:48 }}>🏎</div>
+    );
+  }
+
+  return (
+    <div style={{ position:"relative" }}>
+      <div ref={trackRef} onScroll={handleScroll} className="no-scrollbar"
+        style={{ display:"flex", overflowX:"auto", scrollSnapType:"x mandatory", WebkitOverflowScrolling:"touch" }}>
+        {media.map((m, i) => (
+          <div key={i} style={{ flex:"0 0 100%", scrollSnapAlign:"center", aspectRatio:"1", background:"#0A0A0C" }}>
+           {m.media_type === "video" ? (
+              <video src={m.media_url} controls playsInline preload="metadata"
+                style={{ width:"100%", height:"100%", objectFit:"contain", background:"#0A0A0C" }} />
+            ) : (
+              <img src={m.media_url} alt="" loading={i===0?"eager":"lazy"}
+                style={{ width:"100%", height:"100%", objectFit:"contain", background:"#0A0A0C" }} />
+            )}
+          </div>
+        ))}
+      </div>
+
+      {media.length > 1 && (
+        <>
+          <div style={{ position:"absolute", top:10, right:10, background:"rgba(0,0,0,.6)",
+            color:"#fff", fontSize:11, fontWeight:700, padding:"3px 9px", borderRadius:10 }}>
+            {idx+1}/{media.length}
+          </div>
+          <div style={{ position:"absolute", bottom:10, left:0, right:0,
+            display:"flex", justifyContent:"center", gap:5 }}>
+            {media.map((_, i) => (
+              <button key={i} onClick={() => goTo(i)} aria-label={`Go to media ${i+1}`}
+                style={{ width:i===idx?14:5, height:5, borderRadius:3, border:"none", padding:0,
+                  background:i===idx?"#E8430A":"rgba(255,255,255,.4)", transition:"width .15s ease",
+                  cursor:"pointer" }} />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function CommentsSheet({ spot, onClose }) {
   const { user, profile } = useAuth();
   const [comments,  setComments]  = useState([]);
@@ -3808,7 +3953,6 @@ function CommentsSheet({ spot, onClose }) {
   const [likes,     setLikes]     = useState(spot.likes || 0);
   const [saved,     setSaved]     = useState(spot.saved || false);
   const [showShare, setShowShare] = useState(false);
-  const [imgErr,    setImgErr]    = useState(false);
   const inputRef  = useRef(null);
   const bottomRef = useRef(null);
 
@@ -3954,17 +4098,12 @@ function CommentsSheet({ spot, onClose }) {
         {/* Scrollable content */}
         <div style={{ flex:1, overflowY:"auto" }}>
 
+          {/* Media gallery */}
+          <MediaGallery spotId={spot.id} fallbackImage={spot.image} />
+
           {/* Spot summary */}
-          <div style={{ padding:"0 16px 14px", borderBottom:"1px solid #252530" }}>
+          <div style={{ padding:"14px 16px 14px", borderBottom:"1px solid #252530" }}>
             <div style={{ display:"flex", gap:12, alignItems:"center" }}>
-              <div style={{ width:64, height:64, borderRadius:10, overflow:"hidden", flexShrink:0 }}>
-                {spot.image && !imgErr
-                  ? <img src={spot.image} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}
-                      onError={() => setImgErr(true)} />
-                  : <div style={{ width:"100%", height:"100%", background:"#2D1200",
-                      display:"flex", alignItems:"center", justifyContent:"center", fontSize:24 }}>🏎</div>
-                }
-              </div>
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:20,
                   fontWeight:900, color:"#F2EEE8", lineHeight:1, marginBottom:4 }}>
