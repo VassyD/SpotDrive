@@ -14,6 +14,11 @@ jobs:
       - name: Check if it's actually ~3am in Adelaide right now
         id: check_time
         run: |
+          if [ "${{ github.event_name }}" != "schedule" ]; then
+            echo "Manually triggered — running regardless of time."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           LOCAL_HOUR=$(TZ="Australia/Adelaide" date +"%H")
           echo "Current Adelaide local hour: $LOCAL_HOUR"
           if [ "$LOCAL_HOUR" = "03" ]; then
