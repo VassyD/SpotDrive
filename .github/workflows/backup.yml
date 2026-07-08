@@ -13,6 +13,17 @@ jobs:
       - name: Install PostgreSQL client tools
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
+      - name: Check secret is present (safe - never prints the value)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "SUPABASE_DB_URL is EMPTY or not found"
+            exit 1
+          else
+            echo "SUPABASE_DB_URL is set, length: ${#SUPABASE_DB_URL} characters"
+          fi
+
       - name: Dump database
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
