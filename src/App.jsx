@@ -4251,67 +4251,59 @@ function LeaderboardScreen() {
   const [loading, setLoading] = useState(true);
   const [viewProfile, setViewProfile] = useState(null);
 
-  const MOCK_LEADERS = {
-    global: [
-      { rank:1,  handle:"jdm_tokyo",    display_name:"Kenji Tanaka",   spots:1204, followers:91000,  score:48200, streak:23, badge:"🏆", initials:"KT" },
-      { rank:2,  handle:"euro_spotter", display_name:"Lena Müller",    spots:889,  followers:54200,  score:41800, streak:15, badge:"🥈", initials:"LM" },
-      { rank:3,  handle:"gulf_spots",   display_name:"Omar Al-Rashid", spots:567,  followers:38700,  score:36100, streak:8,  badge:"🥉", initials:"OR" },
-      { rank:4,  handle:"apex_hunter",  display_name:"Tyler Rhodes",   spots:412,  followers:18400,  score:28400, streak:12, badge:"",   initials:"AH" },
-      { rank:5,  handle:"la_spotter",   display_name:"Marcus Webb",    spots:203,  followers:12100,  score:19200, streak:5,  badge:"",   initials:"MW" },
-      { rank:6,  handle:"nring_nut",    display_name:"Hans Fischer",   spots:145,  followers:8300,   score:12800, streak:3,  badge:"",   initials:"HF" },
-    ],
-    city: [
-      { rank:1,  handle:"jdm_tokyo",    display_name:"Kenji Tanaka",   city:"Tokyo",        spots:412, score:18200, badge:"🏆", initials:"KT" },
-      { rank:2,  handle:"gulf_spots",   display_name:"Omar Al-Rashid", city:"Dubai",        spots:287, score:14100, badge:"🥈", initials:"OR" },
-      { rank:3,  handle:"euro_spotter", display_name:"Lena Müller",    city:"Monaco",       spots:234, score:12800, badge:"🥉", initials:"LM" },
-      { rank:4,  handle:"apex_hunter",  display_name:"Tyler Rhodes",   city:"Beverly Hills",spots:198, score:10200, badge:"",   initials:"AH" },
-      { rank:5,  handle:"la_spotter",   display_name:"Marcus Webb",    city:"Los Angeles",  spots:167, score:8900,  badge:"",   initials:"MW" },
-    ],
-    hypercar: [
-      { rank:1,  handle:"euro_spotter", display_name:"Lena Müller",    spots:234, score:46800, badge:"🏆", initials:"LM", rarity:"Hypercar" },
-      { rank:2,  handle:"jdm_tokyo",    display_name:"Kenji Tanaka",   spots:198, score:39600, badge:"🥈", initials:"KT", rarity:"Hypercar" },
-      { rank:3,  handle:"gulf_spots",   display_name:"Omar Al-Rashid", spots:156, score:31200, badge:"🥉", initials:"OR", rarity:"Hypercar" },
-    ],
-    exotic: [
-      { rank:1,  handle:"apex_hunter",  display_name:"Tyler Rhodes",   spots:312, score:28100, badge:"🏆", initials:"AH", rarity:"Exotic" },
-      { rank:2,  handle:"gulf_spots",   display_name:"Omar Al-Rashid", spots:289, score:26000, badge:"🥈", initials:"OR", rarity:"Exotic" },
-      { rank:3,  handle:"la_spotter",   display_name:"Marcus Webb",    spots:201, score:18100, badge:"🥉", initials:"MW", rarity:"Exotic" },
-    ],
-    sports: [
-      { rank:1,  handle:"nring_nut",    display_name:"Hans Fischer",   spots:445, score:22300, badge:"🏆", initials:"HF", rarity:"Sports" },
-      { rank:2,  handle:"jdm_tokyo",    display_name:"Kenji Tanaka",   spots:389, score:19500, badge:"🥈", initials:"KT", rarity:"Sports" },
-      { rank:3,  handle:"apex_hunter",  display_name:"Tyler Rhodes",   spots:301, score:15100, badge:"🥉", initials:"AH", rarity:"Sports" },
-    ],
-  };
+  const RARITY_MAP = { hypercar: "Hypercar", exotic: "Exotic", sports: "Sports" };
 
   useEffect(() => {
     setLoading(true);
     const load = async () => {
-      // Try Supabase first
-      const { data } = await supabase.from("profiles")
-        .select("*").order("followers_count", { ascending:false }).limit(10);
-      if (data && data.length > 0) {
-        setSpotters(data.map((p, i) => ({
-          rank: i+1, handle:p.handle, display_name:p.display_name||p.handle,
-          spots:p.spots_count||0, followers:p.followers_count||0,
-          score: (p.followers_count||0)*2 + (p.spots_count||0)*10,
-          badge: i===0?"🏆":i===1?"🥈":i===2?"🥉":"",
-          initials:(p.handle||"SP").slice(0,2).toUpperCase(),
-          streak:0,
-        })));
+      if (tab === "global") {
+        const { data } = await supabase.from("profiles")
+          .select("id, handle, avatar_url, followers_count, spots_count")
+          .order("followers_count", { ascending: false })
+          .limit(50);
+        const ranked = (data || [])
+          .map(p => ({
+            handle: p.handle, avatar_url: p.avatar_url,
+            spots: p.spots_count || 0, followers: p.followers_count || 0,
+            score: (p.followers_count || 0) * 2 + (p.spots_count || 0) * 10,
+            initials: (p.handle || "SP").slice(0, 2).toUpperCase(),
+          }))
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 10)
+          .map((s, i) => ({ ...s, rank: i + 1, badge: i===0?"🏆":i===1?"🥈":i===2?"🥉":"" }));
+        setSpotters(ranked);
       } else {
-        setSpotters(MOCK_LEADERS[tab] || MOCK_LEADERS.global);
+        const rarity = RARITY_MAP[tab];
+        const { data } = await supabase.from("spots")
+          .select("user_id, profiles(handle, avatar_url)")
+          .eq("status", "live")
+          .eq("rarity", rarity)
+          .limit(500);
+        const counts = {};
+        (data || []).forEach(s => {
+          const uid = s.user_id;
+          if (!counts[uid]) counts[uid] = {
+            handle: s.profiles?.handle || "spotter",
+            avatar_url: s.profiles?.avatar_url,
+            initials: (s.profiles?.handle || "SP").slice(0, 2).toUpperCase(),
+            spots: 0,
+          };
+          counts[uid].spots++;
+        });
+        const ranked = Object.values(counts)
+          .sort((a, b) => b.spots - a.spots)
+          .slice(0, 10)
+          .map((s, i) => ({ ...s, rank: i + 1, score: s.spots * 10, badge: i===0?"🏆":i===1?"🥈":i===2?"🥉":"", rarity }));
+        setSpotters(ranked);
       }
       setLoading(false);
     };
     load();
   }, [tab]);
-
-  const leaders = spotters.length > 0 ? spotters : (MOCK_LEADERS[tab] || []);
+  const leaders = spotters;
 
   const TABS = [
     { key:"global",   label:"🌍 Global"   },
-    { key:"city",     label:"🏙️ City"     },
     { key:"hypercar", label:"👑 Hypercar" },
     { key:"exotic",   label:"🔥 Exotic"   },
     { key:"sports",   label:"🏁 Sports"   },
@@ -4328,7 +4320,7 @@ function LeaderboardScreen() {
           🏆 Leaderboard
         </div>
         <div style={{ fontSize:12, color:"#6B6878" }}>
-          Resets every Monday · Based on spots, likes & followers
+          Based on real spots & followers
         </div>
       </div>
 
