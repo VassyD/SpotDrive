@@ -84,12 +84,15 @@ function AuthProvider({ children }) {
     return () => subscription.unsubscribe();
   }, [fetchProfile]);
 
-  const signUp = useCallback(async ({ email, password, handle, displayName }) => {
+  const signUp = useCallback(async ({ email, password, handle, displayName, dob, town, state, country }) => {
      const { data: existing } = await supabase.from("profiles").select("handle").eq("handle", handle.toLowerCase()).maybeSingle();
     if (existing) throw new Error("That handle is already taken.");
     const { data, error } = await supabase.auth.signUp({
       email, password,
-      options: { data: { handle: handle.toLowerCase(), display_name: displayName } }
+      options: { data: {
+        handle: handle.toLowerCase(), display_name: displayName,
+        date_of_birth: dob || "", town: town || "", state: state || "", country: country || "",
+      } }
     });
     if (error) throw error;
     if (data.user) {
@@ -264,7 +267,7 @@ function LoginForm({ onSwitch }) {
 
 function SignupForm({ onSwitch }) {
   const { signUp } = useAuth();
-  const [form, setForm] = useState({ email:"", password:"", confirm:"", handle:"", name:"" });
+  const [form, setForm] = useState({ email:"", password:"", confirm:"", handle:"", name:"", dob:"", town:"", state:"", country:"" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -276,9 +279,16 @@ function SignupForm({ onSwitch }) {
     if (form.password.length < 6) { setError("Password must be at least 6 characters."); return; }
     if (form.handle.length < 3) { setError("Handle must be at least 3 characters."); return; }
     if (!/^[a-z0-9_]+$/i.test(form.handle)) { setError("Handle: letters, numbers, underscores only."); return; }
+    if (!form.dob) { setError("Date of birth is required."); return; }
+    const dobDate = new Date(form.dob);
+    const ageYears = Math.floor((Date.now() - dobDate.getTime()) / (1000*60*60*24*365.25));
+    if (ageYears < 16) { setError("You must be at least 16 years old to sign up."); return; }
     setLoading(true);
     try {
-      await signUp({ email:form.email, password:form.password, handle:form.handle, displayName:form.name||form.handle });
+      await signUp({
+        email:form.email, password:form.password, handle:form.handle, displayName:form.name||form.handle,
+        dob:form.dob, town:form.town, state:form.state, country:form.country,
+      });
       setSuccess(true);
     } catch (err) { setError(err.message); }
     finally { setLoading(false); }
@@ -311,12 +321,16 @@ function SignupForm({ onSwitch }) {
     <div style={{ background:"#14141A", border:"1px solid #252530", borderRadius:20, padding:28 }}>
       <form onSubmit={handle}>
         <div style={{ display:"flex", flexDirection:"column", gap:12, marginBottom:16 }}>
-          {[
-            { key:"name",     label:"Display Name",     type:"text",     placeholder:"Steve" },
+         {[
+            { key:"name",     label:"Display Name",     type:"text",     placeholder:"Apex" },
             { key:"handle",   label:"Username",          type:"text",     placeholder:"apex_hunter" },
             { key:"email",    label:"Email",             type:"email",    placeholder:"your@email.com" },
             { key:"password", label:"Password",          type:"password", placeholder:"Min 6 characters" },
             { key:"confirm",  label:"Confirm Password",  type:"password", placeholder:"Repeat password" },
+            { key:"dob",      label:"Date of Birth",     type:"date",     placeholder:"" },
+            { key:"town",     label:"Town / City",       type:"text",     placeholder:"Sydney" },
+            { key:"state",    label:"State / Province",  type:"text",     placeholder:"New South Wales" },
+            { key:"country",  label:"Country",           type:"text",     placeholder:"Australia" },
           ].map(({ key, label, type, placeholder }) => (
             <div key={key}>
               <label style={{ fontSize:12, color:"#AAA6A0", fontWeight:600, display:"block", marginBottom:5 }}>{label}</label>
@@ -856,7 +870,7 @@ function SettingsSheet({ onClose, onEditProfile, onChangePhoto, onPrivacy, onNot
           border:"1px solid #252530", display:"flex", alignItems:"center", gap:12 }}>
           <Avatar initials={profile?.handle?.slice(0,2).toUpperCase()||"?"} src={profile?.avatar_url} size={44} />
           <div>
-            <div style={{ fontSize:14, fontWeight:700, color:"#F2EEE8" }}>{profile?.display_name||profile?.handle}</div>
+            <div style={{ fontSize:14, fontWeight:700, color:"#F2EEE8" }}>@{profile?.handle}</div>
             <div style={{ fontSize:12, color:"#6B6878" }}>{user?.email}</div>
           </div>
         </div>
@@ -2793,7 +2807,7 @@ function SpotterProfileSheet({ handle, onClose }) {
                   <Avatar initials={spotter.handle?.slice(0,2).toUpperCase()||"?"} src={spotter.avatar_url} size={64} ring />
                   <div style={{ flex:1 }}>
                     <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:20, fontWeight:900, color:"#F2EEE8" }}>
-                      {spotter.display_name || spotter.handle}
+                      @{spotter.handle}
                     </div>
                     <div style={{ fontSize:12, color:"#6B6878", marginBottom:8 }}>@{spotter.handle}</div>
                     {spotter.bio && <div style={{ fontSize:12, color:"#AAA6A0", lineHeight:1.4, marginBottom:8 }}>{spotter.bio}</div>}
@@ -3025,7 +3039,7 @@ function ExploreScreen({ onSpotTap }) {
                   <div style={{ display:"flex", alignItems:"center", gap:6 }}>
                     <span style={{ fontSize:14, fontWeight:700, color:"#F2EEE8",
                       overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                      {spotter.display_name || spotter.handle}
+                      @{spotter.handle}
                     </span>
                     {spotter.is_verified && <span style={{ fontSize:13 }}>✅</span>}
                   </div>
@@ -3129,7 +3143,7 @@ function ProfileScreen() {
           </div>
           <div>
             <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:22, fontWeight:900, color:"#F2EEE8" }}>
-              {profile?.display_name||profile?.handle||"Spotter"}
+              @{profile?.handle}
             </div>
             <div style={{ fontSize:13, color:"#6B6878" }}>@{profile?.handle}</div>
             {profile?.bio && <div style={{ fontSize:12, color:"#AAA6A0", marginTop:4, maxWidth:260, lineHeight:1.4 }}>{profile.bio}</div>}
@@ -3412,14 +3426,18 @@ function SearchScreen() {
   const inputRef = useRef(null);
   const debounceRef = useRef(null);
 
-  const TRENDING = [
-    { handle:"jdm_tokyo",    display_name:"Kenji Tanaka",   followers_count:91000, initials:"KT", badge:"🏆" },
-    { handle:"euro_spotter", display_name:"Lena Müller",    followers_count:54200, initials:"LM", badge:"⭐" },
-    { handle:"gulf_spots",   display_name:"Omar Al-Rashid", followers_count:38700, initials:"OR", badge:"🔥" },
-    { handle:"apex_hunter",  display_name:"Tyler Rhodes",   followers_count:18400, initials:"AH", badge:"" },
-    { handle:"la_spotter",   display_name:"Marcus Webb",    followers_count:12100, initials:"MW", badge:"" },
-    { handle:"nring_nut",    display_name:"Hans Fischer",   followers_count:8300,  initials:"HF", badge:"" },
-  ];
+  const [trending, setTrending] = useState([]);
+  useEffect(() => {
+    supabase.from("profiles").select("handle, followers_count")
+      .order("followers_count", { ascending: false }).limit(6)
+      .then(({ data }) => {
+        setTrending((data || []).map((p, i) => ({
+          ...p,
+          initials: (p.handle || "SP").slice(0, 2).toUpperCase(),
+          badge: i === 0 ? "🏆" : i === 1 ? "⭐" : i === 2 ? "🔥" : "",
+        })));
+      });
+  }, []);
 
   const search = async (q) => {
     if (!q.trim()) { setResults([]); setSearched(false); return; }
@@ -3469,7 +3487,7 @@ function SearchScreen() {
         <div style={{ display:"flex", alignItems:"center", gap:6 }}>
           <span style={{ fontSize:14, fontWeight:700, color:"#F2EEE8",
             overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-            {spotter.display_name || spotter.handle}
+            @{spotter.handle}
           </span>
           {badge && <span style={{ fontSize:13 }}>{badge}</span>}
         </div>
@@ -3591,7 +3609,7 @@ function SearchScreen() {
               <span style={{ fontSize:14 }}>🔥</span>
               <div style={{ fontSize:13, fontWeight:700, color:"#F2EEE8" }}>Top Spotters</div>
             </div>
-            {TRENDING.map((s, i) => (
+            {trending.map((s, i) => (
               <div key={s.handle} onClick={() => handleSelect(s.handle)}
                 style={{ display:"flex", alignItems:"center", gap:12,
                   padding:"11px 16px", cursor:"pointer", borderBottom:"1px solid #252530" }}>
@@ -3605,12 +3623,12 @@ function SearchScreen() {
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ display:"flex", alignItems:"center", gap:5 }}>
                     <span style={{ fontSize:14, fontWeight:700, color:"#F2EEE8" }}>
-                      {s.display_name}
+                      @{s.handle}
                     </span>
                     {s.badge && <span style={{ fontSize:12 }}>{s.badge}</span>}
                   </div>
                   <div style={{ fontSize:12, color:"#6B6878" }}>
-                    @{s.handle} · <span style={{ color:"#F2EEE8", fontWeight:600 }}>{fmt(s.followers_count)}</span> followers
+                    <span style={{ color:"#F2EEE8", fontWeight:600 }}>{fmt(s.followers_count)}</span> followers
                   </div>
                 </div>
                 <span style={{ fontSize:18, color:"#3D3D4E" }}>›</span>
@@ -4342,7 +4360,7 @@ function LeaderboardScreen() {
               justifyContent:"center", fontSize:20 }}>🥈</div>
             <div style={{ fontSize:11, fontWeight:700, color:"#F2EEE8",
               marginTop:4, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-              {leaders[1].display_name?.split(" ")[0]}
+              @{leaders[1].handle}
             </div>
             <div style={{ fontSize:10, color:"#AAA6A0" }}>{leaders[1].score?.toLocaleString()} pts</div>
           </div>
@@ -4359,7 +4377,7 @@ function LeaderboardScreen() {
               justifyContent:"center", fontSize:24 }}>🏆</div>
             <div style={{ fontSize:12, fontWeight:800, color:"#C9A84C",
               marginTop:4, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-              {leaders[0].display_name?.split(" ")[0]}
+              @{leaders[0].handle}
             </div>
             <div style={{ fontSize:11, color:"#C9A84C" }}>{leaders[0].score?.toLocaleString()} pts</div>
           </div>
@@ -4372,7 +4390,7 @@ function LeaderboardScreen() {
               justifyContent:"center", fontSize:18 }}>🥉</div>
             <div style={{ fontSize:11, fontWeight:700, color:"#F2EEE8",
               marginTop:4, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-              {leaders[2].display_name?.split(" ")[0]}
+              @{leaders[2].handle}
             </div>
             <div style={{ fontSize:10, color:"#CD7F32" }}>{leaders[2].score?.toLocaleString()} pts</div>
           </div>
@@ -4405,7 +4423,7 @@ function LeaderboardScreen() {
             <div style={{ flex:1, minWidth:0 }}>
               <div style={{ fontSize:14, fontWeight:700, color:"#F2EEE8",
                 overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                {s.display_name}
+                @{s.handle}
               </div>
               <div style={{ fontSize:11, color:"#6B6878" }}>
                 @{s.handle}
