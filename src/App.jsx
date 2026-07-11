@@ -3956,8 +3956,10 @@ function MainApp() {
 }
 
 // ─── COMMENT ROW ─────────────────────────────────────────────
-function CommentRow({ comment: c, user, profile, timeAgo, onReply, onDelete }) {
+function CommentRow({ comment: c, user, profile, timeAgo, onReply, onDelete, replies = [], isReply = false }) {
   const [liked, setLiked] = useState(false);
+  const [showReplies, setShowReplies] = useState(false);
+  const topLevelId = isReply ? c.parent_comment_id : c.id;
   const [likes, setLikes] = useState(c.likes_count || 0);
   const [showReportMenu, setShowReportMenu] = useState(false);
   const [reported, setReported] = useState(false);
@@ -3997,6 +3999,7 @@ function CommentRow({ comment: c, user, profile, timeAgo, onReply, onDelete }) {
   };
   
   return (
+    <>
     <div style={{ display:"flex", gap:10, padding:"10px 16px",
       opacity: c.optimistic ? 0.6 : 1, transition:"opacity .3s" }}>
       <Avatar initials={c.initials} src={c.avatar_url} size={34} />
@@ -4036,7 +4039,7 @@ function CommentRow({ comment: c, user, profile, timeAgo, onReply, onDelete }) {
             {liked ? "❤️" : "🤍"}{likes > 0 ? ` ${likes}` : ""}
           </button>
          {user && profile?.handle !== c.handle && (
-            <button onClick={() => onReply(c.handle)}
+            <button onClick={() => onReply(c.handle, topLevelId)}
               style={{ background:"none", border:"none", cursor:"pointer",
                 color:"#6B6878", fontSize:11, fontWeight:600 }}>
               Reply
@@ -4079,14 +4082,37 @@ function CommentRow({ comment: c, user, profile, timeAgo, onReply, onDelete }) {
               )}
             </div>
           )}
-        </div>
+     </div>
       </div>
     </div>
+    {!isReply && replies.length > 0 && (
+        <div style={{ marginLeft:44 }}>
+          {!showReplies ? (
+            <button onClick={() => setShowReplies(true)}
+              style={{ background:"none", border:"none", cursor:"pointer",
+                color:"#6B6878", fontSize:11, fontWeight:700, padding:"4px 0 8px" }}>
+              — View {replies.length} {replies.length === 1 ? "reply" : "replies"}
+            </button>
+          ) : (
+            <>
+              <button onClick={() => setShowReplies(false)}
+                style={{ background:"none", border:"none", cursor:"pointer",
+                  color:"#6B6878", fontSize:11, fontWeight:700, padding:"4px 0 4px" }}>
+                — Hide replies
+              </button>
+              {replies.map(r => (
+                <CommentRow key={r.id} comment={r} user={user} profile={profile}
+                  timeAgo={timeAgo} onReply={onReply} onDelete={onDelete} isReply={true} />
+              ))}
+            </>
+          )}
+       </div>
+      )}
+    </>
   );
 }
-
-// ─── COMMENTS SHEET ───────────────────────────────────────────
-// ─── MEDIA GALLERY (swipeable photos + video) ─────────────────
+// ─── COMMENTS SHEET ────────────────────────────────────────
+// ─── MEDIA GALLERY (swipeable photos + video) ────────────────
 function MediaGallery({ spotId, fallbackImage }) {
   const [media, setMedia] = useState(null); // null = loading, [] = none
   const [idx,   setIdx]   = useState(0);
@@ -4183,6 +4209,8 @@ function CommentsSheet({ spot, onClose }) {
   const [likes,     setLikes]     = useState(spot.likes || 0);
   const [saved,     setSaved]     = useState(spot.saved || false);
   const [showShare, setShowShare] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null); // top-level comment id, or null
+  const [replyingToHandle, setReplyingToHandle] = useState(null);
   const inputRef  = useRef(null);
   const bottomRef = useRef(null);
 
@@ -4222,9 +4250,10 @@ function CommentsSheet({ spot, onClose }) {
   const deleteComment = async (commentId) => {
     const { error } = await supabase.from("comments").delete().eq("id", commentId);
     if (error) { console.error(error); return; }
-    setComments(cs => cs.filter(c => c.id !== commentId));
+    const removedCount = comments.filter(c => c.id === commentId || c.parent_comment_id === commentId).length;
+    setComments(cs => cs.filter(c => c.id !== commentId && c.parent_comment_id !== commentId));
     await supabase.from("spots")
-      .update({ comments_count: Math.max((spot.comments || 1) - 1, 0) })
+      .update({ comments_count: Math.max((spot.comments || 1) - removedCount, 0) })
       .eq("id", spot.id);
   };
 
@@ -4240,7 +4269,11 @@ function CommentsSheet({ spot, onClose }) {
       created_at: new Date().toISOString(),
       likes_count: 0,
       optimistic: true,
+      parent_comment_id: replyingTo,
     };
+    const wasReplyingTo = replyingTo;
+    setReplyingTo(null);
+    setReplyingToHandle(null);
     setComments(cs => [...cs, optimistic]);
     setText("");
     bottomRef.current?.scrollIntoView({ behavior:"smooth" });
@@ -4250,6 +4283,7 @@ function CommentsSheet({ spot, onClose }) {
         spot_id:    spot.id,
         user_id:    user.id,
         text:       optimistic.text,
+        parent_comment_id: wasReplyingTo,
       }).select("*, profiles(handle, avatar_url)").single();
 
       if (error) throw error;
@@ -4409,10 +4443,16 @@ function CommentsSheet({ spot, onClose }) {
               <div style={{ fontSize:12, color:"#6B6878" }}>Be the first to comment on this spot.</div>
             </div>
           ) : (
-          comments.map(c => (
+          comments.filter(c => !c.parent_comment_id).map(c => (
               <CommentRow key={c.id} comment={c} user={user}
                 profile={profile} timeAgo={timeAgo}
-                onReply={(handle) => { setText(`@${handle} `); inputRef.current?.focus(); }}
+                replies={comments.filter(r => r.parent_comment_id === c.id)}
+                onReply={(handle, topLevelId) => {
+                  setText(`@${handle} `);
+                  setReplyingTo(topLevelId);
+                  setReplyingToHandle(handle);
+                  inputRef.current?.focus();
+                }}
                 onDelete={deleteComment} />
             ))
           )}
@@ -4423,6 +4463,15 @@ function CommentsSheet({ spot, onClose }) {
         <div style={{ flexShrink:0, padding:"10px 14px",
           borderTop:"1px solid #252530", background:"#0A0A0C",
           paddingBottom:"max(10px,env(safe-area-inset-bottom))" }}>
+          {replyingToHandle && (
+            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8, fontSize:12, color:"#6B6878" }}>
+              Replying to <span style={{ color:"#E8430A", fontWeight:700 }}>@{replyingToHandle}</span>
+              <button onClick={() => { setReplyingTo(null); setReplyingToHandle(null); setText(""); }}
+                style={{ background:"none", border:"none", color:"#6B6878", cursor:"pointer", fontSize:12, marginLeft:4 }}>
+                ✕ Cancel
+              </button>
+            </div>
+          )}
           <div style={{ display:"flex", gap:10, alignItems:"flex-end" }}>
             <Avatar initials={profile?.handle?.slice(0,2).toUpperCase()||"ME"}
               src={profile?.avatar_url} size={34} />
