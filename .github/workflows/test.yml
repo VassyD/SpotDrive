@@ -79,6 +79,7 @@ jobs:
           npx vitest run tests/integration/spots-count-live.test.ts
           npx vitest run tests/integration/blocks-live.test.ts
           npx vitest run tests/integration/comment-editing-live.test.ts
+          npx vitest run tests/integration/comment-threading-live.test.ts
 
       - name: Stop local Supabase stack
         if: always()
