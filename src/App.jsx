@@ -2703,6 +2703,74 @@ const bottomRef   = useRef(null);
 }
 
 // ─── FOLLOW BUTTON ────────────────────────────────────────────
+function FollowListSheet({ userId, type, onClose, onViewProfile }) {
+  const [list, setList] = useState(null);
+  useEffect(() => {
+    const load = async () => {
+      let query;
+      if (type === "followers") {
+        query = supabase.from("follows")
+          .select("follower:profiles!follows_follower_id_fkey(id, handle, avatar_url)")
+          .eq("following_id", userId);
+      } else {
+        query = supabase.from("follows")
+          .select("following:profiles!follows_following_id_fkey(id, handle, avatar_url)")
+          .eq("follower_id", userId);
+      }
+      const { data } = await query;
+      const key = type === "followers" ? "follower" : "following";
+      setList((data || []).map(r => r[key]).filter(Boolean));
+    };
+    load();
+  }, [userId, type]);
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.85)", zIndex:850,
+      backdropFilter:"blur(6px)", display:"flex", alignItems:"flex-end", justifyContent:"center" }}
+      onClick={e => { if (e.target===e.currentTarget) onClose(); }}>
+      <div style={{ background:"#0A0A0C", width:"100%", maxWidth:430,
+        height:"80vh", borderRadius:"20px 20px 0 0", border:"1px solid #252530",
+        display:"flex", flexDirection:"column", animation:"slideUp .25s ease" }}>
+        <div style={{ padding:"14px 16px 0", flexShrink:0 }}>
+          <div style={{ width:36, height:4, borderRadius:2, background:"#252530", margin:"0 auto 14px" }} />
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+            <button onClick={onClose}
+              style={{ width:32, height:32, borderRadius:"50%", background:"#18181F",
+                border:"1px solid #252530", display:"flex", alignItems:"center",
+                justifyContent:"center", color:"#6B6878", fontSize:18, cursor:"pointer" }}>
+              ‹
+            </button>
+            <span style={{ fontSize:16, fontWeight:800, color:"#F2EEE8" }}>
+              {type === "followers" ? "Followers" : "Following"}
+            </span>
+          </div>
+        </div>
+        <div style={{ flex:1, overflowY:"auto", padding:"0 16px 16px" }}>
+          {list === null ? (
+            <div style={{ display:"flex", justifyContent:"center", padding:40 }}><Spinner size={24} /></div>
+          ) : list.length === 0 ? (
+            <div style={{ textAlign:"center", padding:"60px 20px" }}>
+              <div style={{ fontSize:36, marginBottom:10 }}>👤</div>
+              <div style={{ fontSize:14, color:"#6B6878" }}>
+                {type === "followers" ? "No followers yet" : "Not following anyone yet"}
+              </div>
+            </div>
+          ) : (
+            list.map(p => (
+              <div key={p.id} style={{ display:"flex", alignItems:"center", gap:12,
+                padding:"10px 0", borderBottom:"1px solid #252530", cursor:"pointer" }}
+                onClick={() => onViewProfile(p.handle)}>
+                <Avatar initials={(p.handle||"SP").slice(0,2).toUpperCase()} src={p.avatar_url} size={44} />
+                <div style={{ flex:1, fontSize:14, fontWeight:700, color:"#F2EEE8" }}>@{p.handle}</div>
+                <FollowButton targetUserId={p.id} targetHandle={p.handle} size="sm" />
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 function FollowButton({ targetUserId, targetHandle, size="md" }) {
   const { user } = useAuth();
   const [following,  setFollowing]  = useState(null); // null = loading
@@ -2772,6 +2840,8 @@ function SpotterProfileSheet({ handle, onClose }) {
   const [tab,      setTab]      = useState("spots");
   const [showReportMenu, setShowReportMenu] = useState(false);
   const [reportedUser, setReportedUser] = useState(false);
+  const [showFollowList, setShowFollowList] = useState(null);
+  const [nestedProfile, setNestedProfile] = useState(null);
 
   const handleReportUser = async (reason) => {
     if (!user || !spotter || reportedUser) return;
@@ -2897,15 +2967,16 @@ function SpotterProfileSheet({ handle, onClose }) {
                   </div>
                 </div>
 
-                {/* Stats */}
+               {/* Stats */}
                 <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)",
                   borderTop:"1px solid #252530", paddingTop:12, marginBottom:0 }}>
                   {[
-                    ["Spots",     spots.length],
-                    ["Followers", spotter.followers_count||0],
-                    ["Following", spotter.following_count||0],
-                  ].map(([label, value]) => (
-                    <div key={label} style={{ textAlign:"center" }}>
+                    ["Spots",     spots.length, null],
+                    ["Followers", spotter.followers_count||0, "followers"],
+                    ["Following", spotter.following_count||0, "following"],
+                  ].map(([label, value, listType]) => (
+                    <div key={label} onClick={() => listType && setShowFollowList(listType)}
+                      style={{ textAlign:"center", cursor: listType ? "pointer" : "default" }}>
                       <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:20, fontWeight:900, color:"#F2EEE8" }}>{value}</div>
                       <div style={{ fontSize:10, color:"#6B6878", textTransform:"uppercase", letterSpacing:".05em" }}>{label}</div>
                     </div>
@@ -2976,12 +3047,19 @@ function SpotterProfileSheet({ handle, onClose }) {
               )}
             </div>
           )}
-        </div>
+       </div>
       </div>
+      {showFollowList && (
+        <FollowListSheet userId={spotter.id} type={showFollowList}
+          onClose={() => setShowFollowList(null)}
+          onViewProfile={(h) => { setShowFollowList(null); setNestedProfile(h); }} />
+      )}
+      {nestedProfile && (
+        <SpotterProfileSheet handle={nestedProfile} onClose={() => setNestedProfile(null)} />
+      )}
     </div>
   );
 }
-
 function ExploreScreen({ onSpotTap }) {
   const { user } = useAuth();
   const [tab,      setTab]      = useState("spots");  // spots | spotters
@@ -3161,6 +3239,8 @@ function ProfileScreen() {
   const [uploadingPhoto,    setUploadingPhoto]    = useState(false);
   const [editingSpot,       setEditingSpot]       = useState(null);
   const [showAdmin,         setShowAdmin]         = useState(false);
+  const [showFollowList, setShowFollowList] = useState(null);
+  const [viewProfile, setViewProfile] = useState(null);
   const avatarRef = useRef(null);
 
   useEffect(() => {
@@ -3237,9 +3317,10 @@ function ProfileScreen() {
           </div>
         </div>
 
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", borderTop:"1px solid #252530", paddingTop:14 }}>
-          {[["Spots",spots.length],["Followers",profile?.followers_count||0],["Following",profile?.following_count||0]].map(([label,value]) => (
-            <div key={label} style={{ textAlign:"center" }}>
+       <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", borderTop:"1px solid #252530", paddingTop:14 }}>
+          {[["Spots",spots.length,null],["Followers",profile?.followers_count||0,"followers"],["Following",profile?.following_count||0,"following"]].map(([label,value,listType]) => (
+            <div key={label} onClick={() => listType && setShowFollowList(listType)}
+              style={{ textAlign:"center", cursor: listType ? "pointer" : "default" }}>
               <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:22, fontWeight:900, color:"#F2EEE8" }}>{value}</div>
               <div style={{ fontSize:10, color:"#6B6878", textTransform:"uppercase", letterSpacing:".05em" }}>{label}</div>
             </div>
@@ -3286,14 +3367,20 @@ function ProfileScreen() {
           </div>
         </>
       )}
+      {showFollowList && (
+        <FollowListSheet userId={user.id} type={showFollowList}
+          onClose={() => setShowFollowList(null)}
+          onViewProfile={(h) => { setShowFollowList(null); setViewProfile(h); }} />
+      )}
+      {viewProfile && (
+        <SpotterProfileSheet handle={viewProfile} onClose={() => setViewProfile(null)} />
+      )}
     </div>
   );
 }
-
-// ─── MAIN APP ─────────────────────────────────────────────────
-// ─── NOTIFICATIONS SCREEN ────────────────────────────────────
-function NotificationsScreen() {
-  const { user, profile } = useAuth();
+// ─── MAIN APP ────────────────────────────────────────────────
+// ─── NOTIFICATIONS SCREEN ───────────────────────────────────
+function NotificationsScreen() {  const { user, profile } = useAuth();
   const [notifs,   setNotifs]   = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [filter,   setFilter]   = useState("all"); // all | unread | likes | follows
