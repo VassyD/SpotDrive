@@ -4929,16 +4929,10 @@ function EmailConfirmedScreen() {
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError:false, error:null }; }
   static getDerivedStateFromError(e) { return { hasError:true, error:e }; }
-  componentDidCatch(e, info) {
+ componentDidCatch(e, info) {
     console.error("SpotDrive crash:", e, info);
-    console.log("DEBUG: componentDidCatch reached, DSN present:", !!import.meta.env.VITE_SENTRY_DSN);
     if (import.meta.env.VITE_SENTRY_DSN) {
-      try {
-        const eventId = Sentry.captureException(e, { contexts: { react: { componentStack: info.componentStack } } });
-        console.log("DEBUG: Sentry.captureException returned:", eventId);
-      } catch (sentryErr) {
-        console.log("DEBUG: Sentry.captureException THREW:", sentryErr);
-      }
+      Sentry.captureException(e, { contexts: { react: { componentStack: info.componentStack } } });
     }
   }
   render() {
@@ -4965,13 +4959,7 @@ class ErrorBoundary extends React.Component {
 }
 
 function AppContent() {
-  const { user, loading } = useAuth();
-  useEffect(() => {
-    if (window.location.search.includes("sentrytest")) {
-      throw new Error("Sentry production verification test - safe to ignore");
-    }
-  }, []);
-  const { confirming, confirmed, confError } = useEmailConfirmation();
+  const { user, loading } = useAuth();  const { confirming, confirmed, confError } = useEmailConfirmation();
   const [timedOut,  setTimedOut]  = useState(false);
   const [onboarded, setOnboarded] = useState(() =>
     typeof localStorage !== "undefined" && !!localStorage.getItem(ONBOARDING_KEY)
