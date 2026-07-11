@@ -3874,8 +3874,23 @@ function CommentRow({ comment: c, user, profile, timeAgo, onReply, onDelete }) {
   const [likes, setLikes] = useState(c.likes_count || 0);
   const [showReportMenu, setShowReportMenu] = useState(false);
   const [reported, setReported] = useState(false);
-  const handleLike = () => {
-    const next = !liked;
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(c.text);
+  const [displayText, setDisplayText] = useState(c.text);
+  const [editedAt, setEditedAt] = useState(c.edited_at);
+  const [saving, setSaving] = useState(false);
+  const handleSaveEdit = async () => {
+    const trimmed = editText.trim();
+    if (!trimmed || saving) return;
+    setSaving(true);
+    const { error } = await supabase.from("comments").update({ text: trimmed }).eq("id", c.id);
+    setSaving(false);
+    if (error) { console.error(error); return; }
+    setDisplayText(trimmed);
+    setEditedAt(new Date().toISOString());
+    setIsEditing(false);
+  };
+  const handleLike = () => {    const next = !liked;
     setLiked(next);
     setLikes(n => next ? n+1 : n-1);
     if (!c.optimistic) {
@@ -3902,9 +3917,30 @@ function CommentRow({ comment: c, user, profile, timeAgo, onReply, onDelete }) {
         <div style={{ display:"flex", alignItems:"baseline", gap:6, marginBottom:3 }}>
           <span style={{ fontSize:13, fontWeight:700, color:"#F2EEE8" }}>@{c.handle}</span>
           <span style={{ fontSize:10, color:"#6B6878" }}>{timeAgo(c.created_at)}</span>
+          {editedAt && <span style={{ fontSize:10, color:"#6B6878" }}>(edited)</span>}
           {c.optimistic && <span style={{ fontSize:10, color:"#6B6878" }}>sending…</span>}
         </div>
-        <div style={{ fontSize:13, color:"#AAA6A0", lineHeight:1.5 }}>{c.text}</div>
+        {isEditing ? (
+          <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+            <textarea value={editText} onChange={e => setEditText(e.target.value)} rows={2}
+              style={{ fontSize:13, color:"#F2EEE8", background:"#18181F", border:"1px solid #252530",
+                borderRadius:8, padding:8, resize:"none", fontFamily:"inherit" }} />
+            <div style={{ display:"flex", gap:8 }}>
+              <button onClick={handleSaveEdit} disabled={saving}
+                style={{ background:"none", border:"none", cursor:"pointer",
+                  color:"#22C55E", fontSize:11, fontWeight:700 }}>
+                {saving ? "Saving…" : "Save"}
+              </button>
+              <button onClick={() => { setEditText(displayText); setIsEditing(false); }}
+                style={{ background:"none", border:"none", cursor:"pointer",
+                  color:"#6B6878", fontSize:11, fontWeight:700 }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ fontSize:13, color:"#AAA6A0", lineHeight:1.5 }}>{displayText}</div>
+        )}
         <div style={{ display:"flex", alignItems:"center", gap:14, marginTop:6 }}>
           <button onClick={handleLike}
             style={{ display:"flex", alignItems:"center", gap:4, background:"none",
@@ -3917,6 +3953,13 @@ function CommentRow({ comment: c, user, profile, timeAgo, onReply, onDelete }) {
               style={{ background:"none", border:"none", cursor:"pointer",
                 color:"#6B6878", fontSize:11, fontWeight:600 }}>
               Reply
+            </button>
+          )}
+          {user && profile?.handle === c.handle && !c.optimistic && !isEditing && (
+            <button onClick={() => { setEditText(displayText); setIsEditing(true); }}
+              style={{ background:"none", border:"none", cursor:"pointer",
+                color:"#6B6878", fontSize:11, fontWeight:600 }}>
+              Edit
             </button>
           )}
           {user && profile?.handle === c.handle && !c.optimistic && (
