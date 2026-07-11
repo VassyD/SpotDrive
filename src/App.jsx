@@ -4931,8 +4931,14 @@ class ErrorBoundary extends React.Component {
   static getDerivedStateFromError(e) { return { hasError:true, error:e }; }
   componentDidCatch(e, info) {
     console.error("SpotDrive crash:", e, info);
+    console.log("DEBUG: componentDidCatch reached, DSN present:", !!import.meta.env.VITE_SENTRY_DSN);
     if (import.meta.env.VITE_SENTRY_DSN) {
-      Sentry.captureException(e, { contexts: { react: { componentStack: info.componentStack } } });
+      try {
+        const eventId = Sentry.captureException(e, { contexts: { react: { componentStack: info.componentStack } } });
+        console.log("DEBUG: Sentry.captureException returned:", eventId);
+      } catch (sentryErr) {
+        console.log("DEBUG: Sentry.captureException THREW:", sentryErr);
+      }
     }
   }
   render() {
