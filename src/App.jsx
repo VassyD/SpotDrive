@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, memo, createContext, useContext } from "react";
 import { createClient } from "@supabase/supabase-js";
+import * as Sentry from "@sentry/react";
 
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL  || "https://lhahofbryglxdxffxjbr.supabase.co";
 const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxoYWhvZmJyeWdseGR4ZmZ4amJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3MzA5ODgsImV4cCI6MjA5ODMwNjk4OH0.5rmKCnWqROlefWII7QpHsbY8xUMJytL6CoJ8LYsaUGQ";
@@ -4928,7 +4929,12 @@ function EmailConfirmedScreen() {
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError:false, error:null }; }
   static getDerivedStateFromError(e) { return { hasError:true, error:e }; }
-  componentDidCatch(e, info) { console.error("SpotDrive crash:", e, info); }
+  componentDidCatch(e, info) {
+    console.error("SpotDrive crash:", e, info);
+    if (import.meta.env.VITE_SENTRY_DSN) {
+      Sentry.captureException(e, { contexts: { react: { componentStack: info.componentStack } } });
+    }
+  }
   render() {
     if (!this.state.hasError) return this.props.children;
     return (
