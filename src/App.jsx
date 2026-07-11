@@ -395,7 +395,7 @@ function ForgotForm({ onSwitch }) {
 }
 
 // ─── SPOT CARD ────────────────────────────────────────────────
-function SpotCard({ spot, onTap, onLikeChange, onSaveChange }) {
+function SpotCard({ spot, onTap, onLikeChange, onSaveChange, onUserTap }) {
   const { user } = useAuth();
   const [liked,     setLiked]     = useState(spot.liked);
   const [saved,     setSaved]     = useState(spot.saved);
@@ -524,7 +524,8 @@ const handleReport = async (reason) => {
         <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
           <Avatar initials={spot.user?.initials} src={spot.user?.avatar_url} size={28} />
           <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontSize:12, fontWeight:600, color:"#F2EEE8" }}>@{spot.user?.handle}</div>
+            <div onClick={e => { e.stopPropagation(); onUserTap?.(spot.user?.handle); }}
+              style={{ fontSize:12, fontWeight:600, color:"#F2EEE8", cursor:"pointer" }}>@{spot.user?.handle}</div>
             <div style={{ fontSize:10, color:"#6B6878" }}>{spot.location} · {spot.time}</div>
           </div>
         </div>
@@ -1144,6 +1145,26 @@ function NotificationSettingsSheet({ onClose }) {
 // ─── PRIVACY SHEET ────────────────────────────────────────────
 function PrivacySheet({ onClose }) {
   const { user, profile, fetchProfile } = useAuth();
+  const [blockedUsers, setBlockedUsers] = useState([]);
+  const [loadingBlocked, setLoadingBlocked] = useState(true);
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("blocks")
+      .select("id, blocked_id, profiles!blocks_blocked_id_fkey(handle, avatar_url)")
+      .eq("blocker_id", user.id)
+      .then(({ data }) => {
+        setBlockedUsers((data || []).map(b => ({
+          blockId: b.id, handle: b.profiles?.handle || "unknown",
+          avatar_url: b.profiles?.avatar_url,
+        })));
+        setLoadingBlocked(false);
+      });
+  }, [user]);
+  const handleUnblock = async (blockId) => {
+    const { error } = await supabase.from("blocks").delete().eq("id", blockId);
+    if (error) { console.error(error); return; }
+    setBlockedUsers(prev => prev.filter(b => b.blockId !== blockId));
+  };
   const handleDownloadData = async () => {
     if (!user) return;
     try {
@@ -1346,6 +1367,35 @@ const handleDeleteAccount = async () => {
               </div>
             </div>
           ))}
+
+          {/* Blocked Users section */}
+          <div style={{ marginBottom:24 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:"#6B6878",
+              textTransform:"uppercase", letterSpacing:".08em", marginBottom:10 }}>
+              Blocked Users
+            </div>
+            {loadingBlocked ? (
+              <div style={{ display:"flex", justifyContent:"center", padding:20 }}><Spinner size={20} /></div>
+            ) : blockedUsers.length === 0 ? (
+              <div style={{ fontSize:12, color:"#6B6878", padding:"8px 4px" }}>
+                You haven't blocked anyone.
+              </div>
+            ) : (
+              blockedUsers.map(b => (
+                <div key={b.blockId} style={{ display:"flex", alignItems:"center", gap:10,
+                  background:"#18181F", border:"1px solid #252530", borderRadius:12,
+                  padding:"10px 14px", marginBottom:8 }}>
+                  <Avatar initials={b.handle.slice(0,2).toUpperCase()} src={b.avatar_url} size={36} />
+                  <div style={{ flex:1, fontSize:13, fontWeight:600, color:"#F2EEE8" }}>@{b.handle}</div>
+                  <button onClick={() => handleUnblock(b.blockId)}
+                    style={{ padding:"6px 12px", borderRadius:8, fontSize:12, fontWeight:700,
+                      border:"1px solid #252530", background:"none", color:"#6B6878", cursor:"pointer" }}>
+                    Unblock
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
 
           {/* Data & Account section */}
           <div style={{ marginBottom:24 }}>
@@ -2447,9 +2497,19 @@ function FeedScreen({ onSpotTap }) {
   const [showPushBanner,  setShowPushBanner]  = useState(() =>
     typeof Notification !== "undefined" && Notification.permission === "default"
   );
-  const bottomRef   = useRef(null);
+const bottomRef   = useRef(null);
   const channelRef  = useRef(null);
-
+  const [viewProfile, setViewProfile] = useState(null);
+  useEffect(() => {
+    const handleBlocked = (e) => {
+      const blockedId = e.detail?.blockedId;
+      if (!blockedId) return;
+      setSpots(prev => prev.filter(s => s.user_id !== blockedId));
+      queryCache.delete("feed-page-0");
+    };
+    window.addEventListener("spotdrive:blocked", handleBlocked);
+    return () => window.removeEventListener("spotdrive:blocked", handleBlocked);
+  }, []);
   const mapSpot = (s) => ({
     ...s,
     image:    imgUrl(s.image_url, 600),
@@ -2610,9 +2670,10 @@ function FeedScreen({ onSpotTap }) {
                 </div>
               </div>
             ))
-          : spots.map(s => <SpotCard key={s.id} spot={s} onTap={onSpotTap}
+        : spots.map(s => <SpotCard key={s.id} spot={s} onTap={onSpotTap}
              onLikeChange={(id, liked, likes) => setSpots(prev => prev.map(sp => sp.id === id ? { ...sp, liked, likes } : sp))}
               onSaveChange={(id, saved, saves) => setSpots(prev => prev.map(sp => sp.id === id ? { ...sp, saved, saves } : sp))}
+              onUserTap={(handle) => setViewProfile(handle)}
             />)
         }
 
@@ -2636,6 +2697,7 @@ function FeedScreen({ onSpotTap }) {
       </div>
 
       {showStoryUpload && <StoryUploadModal onClose={() => setShowStoryUpload(false)} />}
+      {viewProfile && <SpotterProfileSheet handle={viewProfile} onClose={() => setViewProfile(null)} />}
     </div>
   );
 }
@@ -2720,6 +2782,19 @@ function SpotterProfileSheet({ handle, onClose }) {
     setReportedUser(true);
     setShowReportMenu(false);
   };
+  const [blocking, setBlocking] = useState(false);
+  const handleBlockUser = async () => {
+    if (!user || !spotter || blocking) return;
+    if (!window.confirm(`Block @${spotter.handle}? Neither of you will see each other's content anymore.`)) return;
+    setBlocking(true);
+    const { error } = await supabase.from("blocks").insert({ blocker_id: user.id, blocked_id: spotter.id });
+    setBlocking(false);
+    if (error) { console.error(error); return; }
+    window.dispatchEvent(new CustomEvent("spotdrive:blocked", { detail: { blockedId: spotter.id } }));
+    queryCache.delete("feed-page-0");
+    setShowReportMenu(false);
+    onClose();
+  };
 
   useEffect(() => {
     if (!handle) return;
@@ -2783,6 +2858,12 @@ function SpotterProfileSheet({ handle, onClose }) {
                         {reason}
                       </button>
                     ))}
+                    <button onClick={handleBlockUser} disabled={blocking}
+                      style={{ width:"100%", padding:"9px 12px", background:"none",
+                        border:"none", color:"#EF4444", fontSize:12, fontWeight:700,
+                        textAlign:"left", cursor:"pointer" }}>
+                      {blocking ? "Blocking…" : "Block this user"}
+                    </button>
                   </div>
                 )}
               </div>
