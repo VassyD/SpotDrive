@@ -4960,6 +4960,11 @@ class ErrorBoundary extends React.Component {
 
 function AppContent() {
   const { user, loading } = useAuth();
+  useEffect(() => {
+    if (window.location.search.includes("sentrytest")) {
+      throw new Error("Sentry production verification test - safe to ignore");
+    }
+  }, []);
   const { confirming, confirmed, confError } = useEmailConfirmation();
   const [timedOut,  setTimedOut]  = useState(false);
   const [onboarded, setOnboarded] = useState(() =>
