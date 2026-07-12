@@ -154,8 +154,13 @@ const RARITY = {
 };
 
 const fmt = (n) => { const v = Number(n)||0; return v >= 1000 ? `${(v/1000).toFixed(1)}k` : String(v); };
-
-// ─── ATOMS ────────────────────────────────────────────────────
+const friendlyError = (err) => {
+  const msg = err?.message || String(err);
+  if (msg.includes("Rate limit exceeded")) {
+    return "You're doing that a bit too fast — please wait a while and try again.";
+  }
+  return msg;
+};// ─── ATOMS ────────────────────────────────────────────────────
 const Avatar = memo(({ initials, src, size=36, ring=false }) => {
   const [err, setErr] = useState(false);
   const fs = Math.round(size * 0.36);
@@ -739,9 +744,8 @@ function UploadModal({ onClose }) {
       }));
       const { error: mediaErr } = await supabase.from("spot_media").insert(mediaRows);
       if (mediaErr) throw mediaErr;
-
       setDone(true); setTimeout(onClose, 2000);
-    } catch (err) { setError(err.message); }
+    } catch (err) { setError(friendlyError(err)); }
     finally { setLoading(false); }
   };
 
@@ -4211,6 +4215,7 @@ function CommentsSheet({ spot, onClose }) {
   const [showShare, setShowShare] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null); // top-level comment id, or null
   const [replyingToHandle, setReplyingToHandle] = useState(null);
+  const [commentError, setCommentError] = useState("");
   const inputRef  = useRef(null);
   const bottomRef = useRef(null);
 
@@ -4260,6 +4265,7 @@ function CommentsSheet({ spot, onClose }) {
   const postComment = async () => {
     if (!text.trim() || posting || !user) return;
     setPosting(true);
+    setCommentError("");
     const optimistic = {
       id: `temp-${Date.now()}`,
       text: text.trim(),
@@ -4305,6 +4311,7 @@ function CommentsSheet({ spot, onClose }) {
       // Remove optimistic on failure
       setComments(cs => cs.filter(c => c.id !== optimistic.id));
       setText(optimistic.text);
+      setCommentError(friendlyError(err));
       console.error(err);
     } finally {
       setPosting(false);
@@ -4463,6 +4470,9 @@ function CommentsSheet({ spot, onClose }) {
         <div style={{ flexShrink:0, padding:"10px 14px",
           borderTop:"1px solid #252530", background:"#0A0A0C",
           paddingBottom:"max(10px,env(safe-area-inset-bottom))" }}>
+          {commentError && (
+            <div style={{ fontSize:12, color:"#EF4444", marginBottom:8 }}>{commentError}</div>
+          )}
           {replyingToHandle && (
             <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8, fontSize:12, color:"#6B6878" }}>
               Replying to <span style={{ color:"#E8430A", fontWeight:700 }}>@{replyingToHandle}</span>
