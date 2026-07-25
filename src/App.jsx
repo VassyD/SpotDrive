@@ -88,7 +88,7 @@ function AuthProvider({ children }) {
     return () => subscription.unsubscribe();
   }, [fetchProfile]);
 
-  const signUp = useCallback(async ({ email, password, handle, displayName, dob, town, state, country }) => {
+  const signUp = useCallback(async ({ email, password, handle, displayName, dob, town, state, country, captchaToken }) => {
      const { data: existing } = await supabase.from("profiles").select("handle").eq("handle", handle.toLowerCase()).maybeSingle();
     if (existing) throw new Error("That handle is already taken.");
     const { data, error } = await supabase.auth.signUp({
@@ -96,7 +96,7 @@ function AuthProvider({ children }) {
       options: { data: {
         handle: handle.toLowerCase(), display_name: displayName,
         date_of_birth: dob || "", town: town || "", state: state || "", country: country || "",
-      } }
+      }, captchaToken }
     });
     if (error) throw error;
     if (data.user) {
@@ -106,8 +106,8 @@ function AuthProvider({ children }) {
     return data;
   }, [fetchProfile]);
 
-  const signIn = useCallback(async ({ email, password }) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const signIn = useCallback(async ({ email, password, captchaToken }) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken } });
     if (error) throw error;
     return data;
   }, []);
@@ -117,8 +117,8 @@ function AuthProvider({ children }) {
     setUser(null); setProfile(null);
   }, []);
 
-  const resetPassword = useCallback(async (email) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+  const resetPassword = useCallback(async (email, captchaToken) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin, captchaToken });
     if (error) throw error;
   }, []);
 
@@ -228,16 +228,52 @@ function AuthScreen() {
   );
 }
 
+function TurnstileWidget({ onVerify }) {
+  const containerRef = useRef(null);
+  const widgetIdRef = useRef(null);
+  const onVerifyRef = useRef(onVerify);
+  onVerifyRef.current = onVerify;
+
+  useEffect(() => {
+    let cancelled = false;
+    let pollId;
+    const renderWidget = () => {
+      if (cancelled || !containerRef.current || !window.turnstile) return;
+      widgetIdRef.current = window.turnstile.render(containerRef.current, {
+        sitekey: import.meta.env.VITE_TURNSTILE_SITE_KEY,
+        callback: (token) => onVerifyRef.current(token),
+        "error-callback": () => onVerifyRef.current(""),
+        "expired-callback": () => onVerifyRef.current(""),
+      });
+    };
+    if (window.turnstile) {
+      renderWidget();
+    } else {
+      pollId = setInterval(() => {
+        if (window.turnstile) { clearInterval(pollId); renderWidget(); }
+      }, 100);
+    }
+    return () => {
+      cancelled = true;
+      if (pollId) clearInterval(pollId);
+      if (window.turnstile && widgetIdRef.current !== null) window.turnstile.remove(widgetIdRef.current);
+    };
+  }, []);
+
+  return <div ref={containerRef} style={{ margin:"4px 0 16px" }} />;
+}
+
 function LoginForm({ onSwitch }) {
   const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
 
   const handle = async (e) => {
     e.preventDefault(); setLoading(true); setError("");
-    try { await signIn({ email, password }); }
+    try { await signIn({ email, password, captchaToken }); }
     catch (err) { setError(err.message === "Invalid login credentials" ? "Email or password is incorrect." : err.message); }
     finally { setLoading(false); }
   };
@@ -255,8 +291,9 @@ function LoginForm({ onSwitch }) {
             <input className="sd-input" type="password" placeholder="••••••••" value={password} onChange={e=>setPassword(e.target.value)} required />
           </div>
         </div>
+        <TurnstileWidget onVerify={setCaptchaToken} />
         <ErrorMsg msg={error} />
-        <button className="sd-btn sd-btn-primary" type="submit" disabled={loading} style={{ marginTop:16 }}>
+        <button className="sd-btn sd-btn-primary" type="submit" disabled={loading || !captchaToken} style={{ marginTop:16 }}>
           {loading ? <Spinner size={16} color="#fff" /> : "Sign In"}
         </button>
       </form>
@@ -282,6 +319,7 @@ function SignupForm({ onSwitch }) {
   const [success, setSuccess] = useState(false);
   const update = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
 
+  const [captchaToken, setCaptchaToken] = useState("");
   const handle = async (e) => {
     e.preventDefault(); setError("");
     if (form.password !== form.confirm) { setError("Passwords don't match."); return; }
@@ -296,7 +334,7 @@ function SignupForm({ onSwitch }) {
     try {
       await signUp({
         email:form.email, password:form.password, handle:form.handle, displayName:form.name||form.handle,
-        dob:form.dob, town:form.town, state:form.state, country:form.country,
+        dob:form.dob, town:form.town, state:form.state, country:form.country, captchaToken,
       });
       setSuccess(true);
     } catch (err) { setError(err.message); }
@@ -347,8 +385,9 @@ function SignupForm({ onSwitch }) {
             </div>
           ))}
         </div>
+        <TurnstileWidget onVerify={setCaptchaToken} />
         <ErrorMsg msg={error} />
-        <button className="sd-btn sd-btn-primary" type="submit" disabled={loading} style={{ marginTop:12 }}>
+        <button className="sd-btn sd-btn-primary" type="submit" disabled={loading || !captchaToken} style={{ marginTop:12 }}>
           {loading ? <Spinner size={16} color="#fff" /> : "Create Account"}
         </button>
       </form>
@@ -367,10 +406,11 @@ function ForgotForm({ onSwitch }) {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
 
   const handle = async (e) => {
     e.preventDefault(); setLoading(true); setError("");
-    try { await resetPassword(email); setSent(true); }
+    try { await resetPassword(email, captchaToken); setSent(true); }
     catch (err) { setError(err.message); }
     finally { setLoading(false); }
   };
@@ -390,8 +430,9 @@ function ForgotForm({ onSwitch }) {
           <label style={{ fontSize:12, color:"#AAA6A0", fontWeight:600, display:"block", marginBottom:6 }}>Email address</label>
           <input className="sd-input" type="email" placeholder="your@email.com" value={email} onChange={e=>setEmail(e.target.value)} required />
         </div>
+        <TurnstileWidget onVerify={setCaptchaToken} />
         <ErrorMsg msg={error} />
-        <button className="sd-btn sd-btn-primary" type="submit" disabled={loading} style={{ marginTop:12 }}>
+        <button className="sd-btn sd-btn-primary" type="submit" disabled={loading || !captchaToken} style={{ marginTop:12 }}>
           {loading ? <Spinner size={16} color="#fff" /> : "Send Reset Link"}
         </button>
       </form>
