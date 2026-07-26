@@ -1197,13 +1197,11 @@ function PrivacySheet({ onClose }) {
   const [loadingBlocked, setLoadingBlocked] = useState(true);
   useEffect(() => {
     if (!user) return;
-    supabase.from("blocks")
-      .select("id, blocked_id, profiles!blocks_blocked_id_fkey(handle, avatar_url)")
-      .eq("blocker_id", user.id)
+    supabase.rpc("get_my_blocked_users")
       .then(({ data }) => {
         setBlockedUsers((data || []).map(b => ({
-          blockId: b.id, handle: b.profiles?.handle || "unknown",
-          avatar_url: b.profiles?.avatar_url,
+          blockId: b.block_id, handle: b.handle || "unknown",
+          avatar_url: b.avatar_url,
         })));
         setLoadingBlocked(false);
       });
