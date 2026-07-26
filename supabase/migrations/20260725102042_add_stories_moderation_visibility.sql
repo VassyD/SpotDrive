@@ -19,3 +19,15 @@ USING (
     WHERE profiles.id = stories.user_id AND profiles.is_shadow_banned = true
   )) OR (auth.uid() = user_id)
 );
+-- Real bug fix: "Only live stories visible" was PERMISSIVE, so it was
+-- combined with OR against "Stories viewable by everyone" (also PERMISSIVE)
+-- and had no actual effect - expired stories were never hidden by RLS.
+-- Recreate it as RESTRICTIVE so it actually narrows visibility.
+
+DROP POLICY "Only live stories visible" ON stories;
+
+CREATE POLICY "Only live stories visible"
+ON stories
+AS RESTRICTIVE
+FOR SELECT
+USING (expires_at > now());
