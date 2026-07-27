@@ -2881,6 +2881,28 @@ function FollowButton({ targetUserId, targetHandle, size="md" }) {
   );
 }
 
+// ─── OPEN OR CREATE A CONVERSATION ────────────────────────────
+async function openConversationWith(otherUser, closeProfileSheet) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user || !otherUser) return;
+  const [a, b] = user.id < otherUser.id ? [user.id, otherUser.id] : [otherUser.id, user.id];
+
+  let { data: existing } = await supabase.from("conversations")
+    .select("id").eq("user_a_id", a).eq("user_b_id", b).maybeSingle();
+
+  if (!existing) {
+    const { data: created, error } = await supabase.from("conversations")
+      .insert({ user_a_id: a, user_b_id: b }).select("id").single();
+    if (error) { console.error(error); return; }
+    existing = created;
+  }
+
+  closeProfileSheet?.();
+  window.dispatchEvent(new CustomEvent("spotdrive:open-conversation", {
+    detail: { conversationId: existing.id, otherUser },
+  }));
+}
+
 // ─── SPOTTER PROFILE SHEET ────────────────────────────────────
 function SpotterProfileSheet({ handle, onClose }) {
   const { user } = useAuth();
@@ -3013,7 +3035,17 @@ function SpotterProfileSheet({ handle, onClose }) {
                     </div>
                     <div style={{ fontSize:12, color:"#6B6878", marginBottom:8 }}>@{spotter.handle}</div>
                     {spotter.bio && <div style={{ fontSize:12, color:"#AAA6A0", lineHeight:1.4, marginBottom:8 }}>{spotter.bio}</div>}
-                    <FollowButton targetUserId={spotter.id} targetHandle={spotter.handle} />
+                    <div style={{ display:"flex", gap:8 }}>
+                      <FollowButton targetUserId={spotter.id} targetHandle={spotter.handle} />
+                      {user && spotter && user.id !== spotter.id && (
+                        <button onClick={() => openConversationWith(spotter, onClose)}
+                          style={{ padding:"5px 14px", borderRadius:99, fontSize:11, fontWeight:700,
+                            background:"none", border:"1px solid #252530", color:"#F2EEE8",
+                            cursor:"pointer" }}>
+                          Message
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -3431,11 +3463,17 @@ function ProfileScreen() {
 }
 // ─── MAIN APP ────────────────────────────────────────────────
 // ─── MESSAGES SCREEN ─────────────────────────────────────────
-function MessagesScreen() {
+function MessagesScreen({ directOpen, onDirectOpenHandled }) {
   const { user } = useAuth();
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openConversation, setOpenConversation] = useState(null);
+
+  useEffect(() => {
+    if (!directOpen) return;
+    setOpenConversation({ id: directOpen.id, otherUser: directOpen.otherUser });
+    onDirectOpenHandled?.();
+  }, [directOpen]);
 
   const loadConversations = useCallback(async () => {
     if (!user) return;
@@ -4206,6 +4244,16 @@ function MainApp() {
 
   useEffect(() => { refreshUnread(); }, [refreshUnread]);
 
+  const [directOpenConversation, setDirectOpenConversation] = useState(null);
+  useEffect(() => {
+    const handler = (e) => {
+      setDirectOpenConversation({ id: e.detail.conversationId, otherUser: e.detail.otherUser });
+      setShowMessages(true);
+    };
+    window.addEventListener("spotdrive:open-conversation", handler);
+    return () => window.removeEventListener("spotdrive:open-conversation", handler);
+  }, []);
+
   const NAV = [
     { key:"feed",        label:"Feed",        icon:"🏠" },
     { key:"explore",     label:"Explore",     icon:"🧭" },
@@ -4339,7 +4387,7 @@ function MainApp() {
               <div style={{ width:36, height:4, borderRadius:2, background:"#252530", margin:"0 auto 14px" }} />
             </div>
             <div style={{ flex:1, overflowY:"auto" }}>
-              <MessagesScreen />
+              <MessagesScreen directOpen={directOpenConversation} onDirectOpenHandled={() => setDirectOpenConversation(null)} />
             </div>
             <div style={{ padding:"12px 16px", borderTop:"1px solid #252530", flexShrink:0 }}>
               <button onClick={() => { setShowMessages(false); refreshUnread(); }}
