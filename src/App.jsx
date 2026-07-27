@@ -3437,9 +3437,8 @@ function MessagesScreen() {
   const [loading, setLoading] = useState(true);
   const [openConversation, setOpenConversation] = useState(null);
 
-  useEffect(() => {
+  const loadConversations = useCallback(async () => {
     if (!user) return;
-    const load = async () => {
       const { data: convs } = await supabase
         .from("conversations")
         .select("*, userA:profiles!conversations_user_a_id_fkey(id,handle,avatar_url), userB:profiles!conversations_user_b_id_fkey(id,handle,avatar_url)")
@@ -3481,9 +3480,9 @@ function MessagesScreen() {
       });
       setConversations(mapped);
       setLoading(false);
-    };
-    load();
   }, [user]);
+
+  useEffect(() => { loadConversations(); }, [loadConversations]);
 
   const timeAgo = (ts) => {
     if (!ts) return "";
@@ -3541,17 +3540,186 @@ function MessagesScreen() {
         ))
       )}
       {openConversation && (
-        <div style={{ position:"fixed", inset:0, background:"#0A0A0C", zIndex:600 }}>
-          <div style={{ padding:40, textAlign:"center", color:"#6B6878" }}>
-            Conversation view coming in Stage 2 — @{openConversation.otherUser?.handle}
-          </div>
-          <button onClick={() => setOpenConversation(null)}
-            style={{ position:"absolute", top:14, left:16, width:32, height:32, borderRadius:"50%",
-              background:"#18181F", border:"1px solid #252530", color:"#6B6878", fontSize:18, cursor:"pointer" }}>
-            ‹
-          </button>
-        </div>
+        <ConversationView conversation={openConversation} currentUserId={user.id}
+          onClose={() => { setOpenConversation(null); loadConversations(); }} />
       )}
+    </div>
+  );
+}
+
+// ─── CONVERSATION VIEW ───────────────────────────────────────
+function ConversationView({ conversation, currentUserId, onClose }) {
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const bottomRef = useRef(null);
+  const fileRef = useRef(null);
+  const channelRef = useRef(null);
+  const otherUser = conversation.otherUser;
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const { data } = await supabase
+        .from("messages").select("*")
+        .eq("conversation_id", conversation.id)
+        .order("created_at", { ascending: true });
+      if (cancelled) return;
+      setMessages(data || []);
+      setLoading(false);
+      const unreadIds = (data || [])
+        .filter(m => m.sender_id !== currentUserId && !m.read_at)
+        .map(m => m.id);
+      if (unreadIds.length > 0) {
+        await supabase.from("messages")
+          .update({ read_at: new Date().toISOString() }).in("id", unreadIds);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [conversation.id, currentUserId]);
+
+  useEffect(() => {
+    channelRef.current = supabase
+      .channel(`conversation-${conversation.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages",
+        filter: `conversation_id=eq.${conversation.id}` }, (payload) => {
+        setMessages(prev => [...prev, payload.new]);
+        if (payload.new.sender_id !== currentUserId) {
+          supabase.from("messages").update({ read_at: new Date().toISOString() }).eq("id", payload.new.id);
+        }
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages",
+        filter: `conversation_id=eq.${conversation.id}` }, (payload) => {
+        setMessages(prev => prev.map(m => m.id === payload.new.id ? payload.new : m));
+      })
+      .subscribe();
+    return () => { if (channelRef.current) supabase.removeChannel(channelRef.current); };
+  }, [conversation.id, currentUserId]);
+
+  useEffect(() => {
+    if (!loading) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
+
+  const sendMessage = async () => {
+    const trimmed = text.trim();
+    if (!trimmed || sending) return;
+    setSending(true);
+    setText("");
+    const { error } = await supabase.from("messages").insert({
+      conversation_id: conversation.id, sender_id: currentUserId, text: trimmed,
+    });
+    setSending(false);
+    if (error) { console.error(error); setText(trimmed); }
+  };
+
+  const handlePhotoSelect = async (file) => {
+    if (!file || uploadingPhoto) return;
+    setUploadingPhoto(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `messages/${currentUserId}/${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from("spot-photos")
+        .upload(path, file, { contentType: file.type });
+      if (uploadErr) throw uploadErr;
+      const { data: { publicUrl } } = supabase.storage.from("spot-photos").getPublicUrl(path);
+      const { error: insertErr } = await supabase.from("messages").insert({
+        conversation_id: conversation.id, sender_id: currentUserId, photo_url: publicUrl,
+      });
+      if (insertErr) throw insertErr;
+    } catch (err) { console.error(err); }
+    finally { setUploadingPhoto(false); }
+  };
+
+  const timeAgo = (ts) => {
+    const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
+    if (m < 1) return "just now";
+    if (m < 60) return `${m}m`;
+    if (m < 1440) return `${Math.floor(m/60)}h`;
+    return `${Math.floor(m/1440)}d`;
+  };
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"#0A0A0C", zIndex:600, display:"flex", flexDirection:"column" }}>
+      <div style={{ display:"flex", alignItems:"center", gap:10, padding:"14px 16px",
+        borderBottom:"1px solid #252530", flexShrink:0 }}>
+        <button onClick={onClose}
+          style={{ width:32, height:32, borderRadius:"50%", background:"#18181F",
+            border:"1px solid #252530", color:"#6B6878", fontSize:18, cursor:"pointer",
+            display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+          ‹
+        </button>
+        <Avatar initials={(otherUser?.handle||"SP").slice(0,2).toUpperCase()} src={otherUser?.avatar_url} size={32} />
+        <span style={{ fontSize:15, fontWeight:700, color:"#F2EEE8" }}>@{otherUser?.handle}</span>
+      </div>
+
+      <div style={{ flex:1, overflowY:"auto", padding:"14px 16px", display:"flex", flexDirection:"column", gap:8 }}>
+        {loading ? (
+          <div style={{ display:"flex", justifyContent:"center", padding:40 }}><Spinner size={28} /></div>
+        ) : messages.length === 0 ? (
+          <div style={{ textAlign:"center", padding:"40px 20px", color:"#6B6878", fontSize:13 }}>
+            Say hi to @{otherUser?.handle}
+          </div>
+        ) : (
+          messages.map(m => {
+            const isMine = m.sender_id === currentUserId;
+            return (
+              <div key={m.id} style={{ display:"flex", justifyContent: isMine ? "flex-end" : "flex-start" }}>
+                <div style={{ maxWidth:"75%" }}>
+                  <div style={{
+                    background: isMine ? "#E8430A" : "#18181F",
+                    border: isMine ? "none" : "1px solid #252530",
+                    borderRadius: isMine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+                    padding: m.photo_url ? 4 : "9px 13px",
+                    color: isMine ? "#fff" : "#F2EEE8",
+                    fontSize:13.5, lineHeight:1.4, overflow:"hidden" }}>
+                    {m.photo_url && (
+                      <img src={m.photo_url} alt="" style={{ display:"block", width:"100%",
+                        maxWidth:220, borderRadius:12, marginBottom: m.text ? 6 : 0 }} />
+                    )}
+                    {m.text && <div style={{ padding: m.photo_url ? "0 9px 6px" : 0 }}>{m.text}</div>}
+                  </div>
+                  <div style={{ fontSize:10, color:"#6B6878", marginTop:3,
+                    textAlign: isMine ? "right" : "left" }}>
+                    {timeAgo(m.created_at)}{isMine && m.read_at ? " · Read" : ""}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      <div style={{ padding:"10px 16px", borderTop:"1px solid #252530", flexShrink:0 }}>
+        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+          <button onClick={() => fileRef.current?.click()} disabled={uploadingPhoto}
+            style={{ width:36, height:36, borderRadius:"50%", background:"#18181F",
+              border:"1px solid #252530", color:"#6B6878", fontSize:16, cursor:"pointer",
+              flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
+            {uploadingPhoto ? <Spinner size={14} /> : "📷"}
+          </button>
+          <input ref={fileRef} type="file" accept="image/*" style={{ display:"none" }}
+            onChange={e => { handlePhotoSelect(e.target.files[0]); e.target.value = ""; }} />
+          <div style={{ flex:1, background:"#14141A", border:"1.5px solid #252530",
+            borderRadius:22, padding:"8px 14px", display:"flex", alignItems:"center", gap:8 }}>
+            <input value={text} onChange={e => setText(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+              placeholder="Message…"
+              style={{ flex:1, background:"none", border:"none", color:"#F2EEE8",
+                fontSize:14, outline:"none", minWidth:0 }} />
+          </div>
+          {text.trim() && (
+            <button onClick={sendMessage} disabled={sending}
+              style={{ background:"none", border:"none", color:"#E8430A",
+                fontWeight:700, fontSize:13, cursor:"pointer", flexShrink:0 }}>
+              {sending ? <Spinner size={14} color="#E8430A" /> : "Send"}
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
