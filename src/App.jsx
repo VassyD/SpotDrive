@@ -1298,10 +1298,11 @@ const handleDeleteAccount = async () => {
 
   const toggle = (key) => setSettings(p => ({ ...p, [key]: !p[key] }));
 
+  const [settingsError, setSettingsError] = useState("");
   const saveSettings = async () => {
-    setSaving(true); setSaved(false);
+    setSaving(true); setSaved(false); setSettingsError("");
     try {
-      await supabase.from("profiles").update({
+      const { error } = await supabase.from("profiles").update({
         is_private:       settings.privateAccount,
         show_location:    settings.showLocation,
         allow_tagging:    settings.allowTagging,
@@ -1309,10 +1310,11 @@ const handleDeleteAccount = async () => {
         allow_messages:   settings.allowMessages,
         data_analytics:   settings.dataAnalytics,
       }).eq("id", user.id);
+      if (error) throw error;
       await fetchProfile(user.id);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-    } catch(err) { console.error(err); }
+    } catch(err) { setSettingsError(err.message); console.error(err); }
     finally { setSaving(false); }
   };
 
@@ -1469,6 +1471,7 @@ const handleDeleteAccount = async () => {
             ))}
           </div>
 
+          <ErrorMsg msg={settingsError} />
           {/* Save button */}
           <button onClick={saveSettings} disabled={saving}
             style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"center",
@@ -3135,6 +3138,7 @@ function ExploreScreen({ onSpotTap }) {
     if (tab !== "spotters") return;
     setLoadingSpotters(true);
     supabase.from("profiles").select("*")
+      .eq("show_leaderboard", true)
       .order("followers_count", { ascending:false }).limit(20)
       .then(({ data }) => {
         setSpotters((data || []).map(p => ({
@@ -3645,6 +3649,7 @@ function SearchScreen() {
   const [trending, setTrending] = useState([]);
   useEffect(() => {
     supabase.from("profiles").select("handle, followers_count")
+      .eq("show_leaderboard", true)
       .order("followers_count", { ascending: false }).limit(6)
       .then(({ data }) => {
         setTrending((data || []).map((p, i) => ({
@@ -4037,6 +4042,7 @@ function useMentionSuggestions(text, userId) {
         .select("id, handle, avatar_url")
         .ilike("handle", `${mention.query}%`)
         .neq("id", userId || "")
+        .eq("allow_tagging", true)
         .limit(5);
       setSuggestions(data || []);
     }, 200);
@@ -4637,6 +4643,7 @@ function LeaderboardScreen() {
       if (tab === "global") {
         const { data } = await supabase.from("profiles")
           .select("id, handle, avatar_url, followers_count, spots_count")
+          .eq("show_leaderboard", true)
           .order("followers_count", { ascending: false })
           .limit(50);
         const ranked = (data || [])
@@ -4653,7 +4660,8 @@ function LeaderboardScreen() {
       } else {
         const rarity = RARITY_MAP[tab];
         const { data } = await supabase.from("spots")
-          .select("user_id, profiles(handle, avatar_url)")
+          .select("user_id, profiles!inner(handle, avatar_url, show_leaderboard)")
+          .eq("profiles.show_leaderboard", true)
           .eq("status", "live")
           .eq("rarity", rarity)
           .limit(500);
