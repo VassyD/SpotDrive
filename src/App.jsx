@@ -4050,7 +4050,7 @@ function MentionAutocomplete({ text, userId, onInsert }) {
   const { mention, suggestions } = useMentionSuggestions(text, userId);
   if (!mention || suggestions.length === 0) return null;
   return (
-    <div style={{ position:"absolute", top:"100%", left:0, marginTop:6, background:"#14141A",
+    <div style={{ position:"absolute", bottom:"100%", left:0, marginBottom:6, background:"#14141A",
       border:"1px solid #252530", borderRadius:12, overflow:"hidden", zIndex:50, minWidth:180,
       boxShadow:"0 4px 16px rgba(0,0,0,.4)" }}>
       {suggestions.map(s => (
