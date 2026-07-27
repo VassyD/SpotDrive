@@ -4002,6 +4002,16 @@ function MainApp() {
 }
 
 // ─── COMMENT ROW ─────────────────────────────────────────────
+function renderWithMentions(text) {
+  if (!text) return text;
+  const parts = text.split(/(@[a-zA-Z0-9_]+)/g);
+  return parts.map((part, i) =>
+    /^@[a-zA-Z0-9_]+$/.test(part)
+      ? <span key={i} style={{ color:"#E8430A", fontWeight:700 }}>{part}</span>
+      : part
+  );
+}
+
 function CommentRow({ comment: c, user, profile, timeAgo, onReply, onDelete, replies = [], isReply = false }) {
   const [liked, setLiked] = useState(false);
   const [showReplies, setShowReplies] = useState(false);
@@ -4075,7 +4085,7 @@ function CommentRow({ comment: c, user, profile, timeAgo, onReply, onDelete, rep
             </div>
           </div>
         ) : (
-          <div style={{ fontSize:13, color:"#AAA6A0", lineHeight:1.5 }}>{displayText}</div>
+          <div style={{ fontSize:13, color:"#AAA6A0", lineHeight:1.5 }}>{renderWithMentions(displayText)}</div>
         )}
         <div style={{ display:"flex", alignItems:"center", gap:14, marginTop:6 }}>
           <button onClick={handleLike}
@@ -4461,7 +4471,7 @@ function CommentsSheet({ spot, onClose }) {
             {spot.description && (
               <p style={{ fontSize:13, color:"#AAA6A0", lineHeight:1.6, marginTop:10 }}>
                 <span style={{ color:"#F2EEE8", fontWeight:700 }}>@{spot.user?.handle} </span>
-                {spot.description}
+                {renderWithMentions(spot.description)}
               </p>
             )}
           </div>

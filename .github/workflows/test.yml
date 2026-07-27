@@ -81,6 +81,8 @@ jobs:
           npx vitest run tests/integration/stories-moderation-live.test.ts
           npx vitest run tests/integration/profiles-block-visibility-live.test.ts
           npx vitest run tests/integration/blocked-users-rpc-live.test.ts
+          npx vitest run tests/integration/tier1-security-hardening-live.test.ts
+          npx vitest run tests/integration/mentions-live.test.ts
           npx vitest run tests/integration/comment-editing-live.test.ts
           npx vitest run tests/integration/comment-threading-live.test.ts
 
