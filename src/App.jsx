@@ -881,9 +881,10 @@ function UploadModal({ onClose }) {
                   })}
                 </div>
               </div>
-              <div>
+              <div style={{ position:"relative" }}>
                 <label style={{ fontSize:11, color:"#6B6878", fontWeight:600, textTransform:"uppercase", letterSpacing:".05em", display:"block", marginBottom:5 }}>Description</label>
                 <textarea className="sd-input" rows={3} placeholder="Tell the story…" value={form.desc} onChange={e=>setForm(p=>({...p,desc:e.target.value}))} style={{ resize:"none", lineHeight:1.55 }} />
+                <MentionAutocomplete text={form.desc} userId={user?.id} onInsert={t => setForm(p=>({...p,desc:t}))} />
               </div>
               <ErrorMsg msg={error} />
               <button className="sd-btn sd-btn-primary" onClick={handlePost} disabled={loading||!form.make||!form.model}>
@@ -4012,6 +4013,58 @@ function renderWithMentions(text) {
   );
 }
 
+function detectMentionQuery(text) {
+  const match = (text || "").match(/@([a-zA-Z0-9_]*)$/);
+  if (!match) return null;
+  return { start: text.length - match[0].length, query: match[1] };
+}
+
+function insertMention(text, start, handle) {
+  return text.slice(0, start) + "@" + handle + " ";
+}
+
+function useMentionSuggestions(text, userId) {
+  const [suggestions, setSuggestions] = useState([]);
+  const debounceRef = useRef(null);
+  const mention = detectMentionQuery(text);
+
+  useEffect(() => {
+    if (!mention || mention.query.length === 0) { setSuggestions([]); return; }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, handle, avatar_url")
+        .ilike("handle", `${mention.query}%`)
+        .neq("id", userId || "")
+        .limit(5);
+      setSuggestions(data || []);
+    }, 200);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [text, userId]);
+
+  return { mention, suggestions };
+}
+
+function MentionAutocomplete({ text, userId, onInsert }) {
+  const { mention, suggestions } = useMentionSuggestions(text, userId);
+  if (!mention || suggestions.length === 0) return null;
+  return (
+    <div style={{ position:"absolute", bottom:"100%", left:0, marginBottom:6, background:"#14141A",
+      border:"1px solid #252530", borderRadius:12, overflow:"hidden", zIndex:50, minWidth:180,
+      boxShadow:"0 4px 16px rgba(0,0,0,.4)" }}>
+      {suggestions.map(s => (
+        <button key={s.id} onClick={() => onInsert(insertMention(text, mention.start, s.handle))}
+          style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"8px 12px",
+            background:"none", border:"none", cursor:"pointer", textAlign:"left" }}>
+          <Avatar initials={(s.handle||"SP").slice(0,2).toUpperCase()} src={s.avatar_url} size={24} />
+          <span style={{ fontSize:13, color:"#F2EEE8", fontWeight:600 }}>@{s.handle}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function CommentRow({ comment: c, user, profile, timeAgo, onReply, onDelete, replies = [], isReply = false }) {
   const [liked, setLiked] = useState(false);
   const [showReplies, setShowReplies] = useState(false);
@@ -4539,7 +4592,7 @@ function CommentsSheet({ spot, onClose }) {
               src={profile?.avatar_url} size={34} />
             <div style={{ flex:1, background:"#14141A", border:"1.5px solid #252530",
               borderRadius:22, padding:"8px 14px", display:"flex", alignItems:"center", gap:8,
-              transition:"border-color .15s",
+              transition:"border-color .15s", position:"relative",
               ...(text ? { borderColor:"#E8430A", boxShadow:"0 0 0 3px #2D1200" } : {}) }}>
               <input
                 ref={inputRef}
@@ -4549,6 +4602,8 @@ function CommentsSheet({ spot, onClose }) {
                 placeholder="Add a comment…"
                 style={{ flex:1, background:"none", border:"none", color:"#F2EEE8",
                   fontSize:14, outline:"none", minWidth:0 }} />
+              <MentionAutocomplete text={text} userId={user?.id}
+                onInsert={t => { setText(t); inputRef.current?.focus(); }} />
               {text.trim() && (
                 <button onClick={postComment} disabled={posting}
                   style={{ background:"none", border:"none", color:"#E8430A",
@@ -4948,7 +5003,7 @@ function EditSpotModal({ spot, onClose, onDeleted }) {
               })}
             </div>
           </div>
-          <div>
+          <div style={{ position:"relative" }}>
             <label style={{ fontSize:11, color:"#6B6878", fontWeight:600,
               textTransform:"uppercase", letterSpacing:".05em", display:"block", marginBottom:5 }}>
               Description
@@ -4957,6 +5012,7 @@ function EditSpotModal({ spot, onClose, onDeleted }) {
               placeholder="Tell the story…"
               onChange={e => setForm(p=>({...p,desc:e.target.value}))}
               style={{ resize:"none", lineHeight:1.55 }} />
+            <MentionAutocomplete text={form.desc} userId={user?.id} onInsert={t => setForm(p=>({...p,desc:t}))} />
           </div>
           <ErrorMsg msg={error} />
           {saved && <div style={{ color:"#22C55E", fontSize:13, textAlign:"center" }}>✓ Saved!</div>}
