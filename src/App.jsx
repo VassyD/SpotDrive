@@ -3430,6 +3430,132 @@ function ProfileScreen() {
   );
 }
 // ─── MAIN APP ────────────────────────────────────────────────
+// ─── MESSAGES SCREEN ─────────────────────────────────────────
+function MessagesScreen() {
+  const { user } = useAuth();
+  const [conversations, setConversations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [openConversation, setOpenConversation] = useState(null);
+
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      const { data: convs } = await supabase
+        .from("conversations")
+        .select("*, userA:profiles!conversations_user_a_id_fkey(id,handle,avatar_url), userB:profiles!conversations_user_b_id_fkey(id,handle,avatar_url)")
+        .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
+        .order("created_at", { ascending: false });
+
+      const list = convs || [];
+      const ids = list.map(c => c.id);
+      let messagesByConv = {};
+      if (ids.length > 0) {
+        const { data: msgs } = await supabase
+          .from("messages")
+          .select("*")
+          .in("conversation_id", ids)
+          .order("created_at", { ascending: true });
+        (msgs || []).forEach(m => {
+          if (!messagesByConv[m.conversation_id]) messagesByConv[m.conversation_id] = [];
+          messagesByConv[m.conversation_id].push(m);
+        });
+      }
+
+      const mapped = list.map(c => {
+        const otherUser = c.user_a_id === user.id ? c.userB : c.userA;
+        const msgs = messagesByConv[c.id] || [];
+        const last = msgs[msgs.length - 1];
+        const unread = msgs.filter(m => m.sender_id !== user.id && !m.read_at).length;
+        return {
+          id: c.id,
+          otherUser,
+          lastText: last ? (last.text || "📷 Photo") : "No messages yet",
+          lastTime: last?.created_at,
+          unread,
+        };
+      });
+      mapped.sort((a, b) => {
+        if (!a.lastTime) return 1;
+        if (!b.lastTime) return -1;
+        return new Date(b.lastTime) - new Date(a.lastTime);
+      });
+      setConversations(mapped);
+      setLoading(false);
+    };
+    load();
+  }, [user]);
+
+  const timeAgo = (ts) => {
+    if (!ts) return "";
+    const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
+    if (m < 1) return "just now";
+    if (m < 60) return `${m}m`;
+    if (m < 1440) return `${Math.floor(m/60)}h`;
+    return `${Math.floor(m/1440)}d`;
+  };
+
+  if (loading) return (
+    <div style={{ display:"flex", justifyContent:"center", padding:40 }}>
+      <Spinner size={28} />
+    </div>
+  );
+
+  return (
+    <div>
+      <div style={{ padding:"16px 16px 12px", borderBottom:"1px solid #252530" }}>
+        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:20, fontWeight:900, color:"#F2EEE8" }}>
+          Messages
+        </div>
+      </div>
+      {conversations.length === 0 ? (
+        <div style={{ textAlign:"center", padding:"60px 20px" }}>
+          <div style={{ fontSize:36, marginBottom:10 }}>✉️</div>
+          <div style={{ fontSize:15, color:"#6B6878" }}>No conversations yet</div>
+        </div>
+      ) : (
+        conversations.map(c => (
+          <button key={c.id} onClick={() => setOpenConversation(c)}
+            style={{ width:"100%", display:"flex", alignItems:"center", gap:12,
+              padding:"12px 16px", background:"none", border:"none",
+              borderBottom:"1px solid #18181F", cursor:"pointer", textAlign:"left" }}>
+            <Avatar initials={(c.otherUser?.handle||"SP").slice(0,2).toUpperCase()} src={c.otherUser?.avatar_url} size={44} />
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline" }}>
+                <span style={{ fontSize:14, fontWeight:700, color:"#F2EEE8" }}>@{c.otherUser?.handle}</span>
+                <span style={{ fontSize:11, color:"#6B6878" }}>{timeAgo(c.lastTime)}</span>
+              </div>
+              <div style={{ fontSize:12.5, color: c.unread>0 ? "#F2EEE8" : "#6B6878",
+                fontWeight: c.unread>0 ? 600 : 400,
+                whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                {c.lastText}
+              </div>
+            </div>
+            {c.unread > 0 && (
+              <div style={{ background:"#E8430A", borderRadius:99, minWidth:20, height:20,
+                display:"flex", alignItems:"center", justifyContent:"center",
+                fontSize:11, fontWeight:700, color:"#fff", padding:"0 6px", flexShrink:0 }}>
+                {c.unread > 9 ? "9+" : c.unread}
+              </div>
+            )}
+          </button>
+        ))
+      )}
+      {openConversation && (
+        <div style={{ position:"fixed", inset:0, background:"#0A0A0C", zIndex:600 }}>
+          <div style={{ padding:40, textAlign:"center", color:"#6B6878" }}>
+            Conversation view coming in Stage 2 — @{openConversation.otherUser?.handle}
+          </div>
+          <button onClick={() => setOpenConversation(null)}
+            style={{ position:"absolute", top:14, left:16, width:32, height:32, borderRadius:"50%",
+              background:"#18181F", border:"1px solid #252530", color:"#6B6878", fontSize:18, cursor:"pointer" }}>
+            ‹
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── NOTIFICATIONS SCREEN ───────────────────────────────────
 function NotificationsScreen() {  const { user, profile } = useAuth();
   const [notifs,   setNotifs]   = useState([]);
@@ -3889,11 +4015,28 @@ function SearchScreen() {
 }
 
 function MainApp() {
+  const { user } = useAuth();
   const [screen,      setScreen]      = useState("feed");
   const [showNotifs,  setShowNotifs]  = useState(false);
-  const [unreadCount, setUnreadCount] = useState(3);
+  const [showMessages, setShowMessages] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const [spotDetail,  setSpotDetail]  = useState(null);
   const [showUpload,  setShowUpload]  = useState(false);
+
+  const refreshUnread = useCallback(async () => {
+    if (!user) return;
+    const { count: notifCount } = await supabase.from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id).eq("read", false).neq("type", "message");
+    const { count: msgCount } = await supabase.from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id).eq("read", false).eq("type", "message");
+    setUnreadCount(notifCount || 0);
+    setUnreadMessages(msgCount || 0);
+  }, [user]);
+
+  useEffect(() => { refreshUnread(); }, [refreshUnread]);
 
   const NAV = [
     { key:"feed",        label:"Feed",        icon:"🏠" },
@@ -3929,6 +4072,20 @@ function MainApp() {
                 display:"flex", alignItems:"center", justifyContent:"center",
                 fontSize:8, fontWeight:800, color:"#fff" }}>
                 {unreadCount > 9 ? "9+" : unreadCount}
+              </div>
+            )}
+          </button>
+          <button onClick={() => setShowMessages(true)}
+            style={{ position:"relative", background:"none", border:"none",
+              width:36, height:36, display:"flex", alignItems:"center",
+              justifyContent:"center", cursor:"pointer", borderRadius:"50%" }}>
+            <span style={{ fontSize:20 }}>✉️</span>
+            {unreadMessages > 0 && (
+              <div style={{ position:"absolute", top:0, right:0, width:16, height:16,
+                borderRadius:"50%", background:"#E8430A", border:"2px solid #0A0A0C",
+                display:"flex", alignItems:"center", justifyContent:"center",
+                fontSize:8, fontWeight:800, color:"#fff" }}>
+                {unreadMessages > 9 ? "9+" : unreadMessages}
               </div>
             )}
           </button>
@@ -3991,6 +4148,33 @@ function MainApp() {
             </div>
             <div style={{ padding:"12px 16px", borderTop:"1px solid #252530", flexShrink:0 }}>
               <button onClick={() => setShowNotifs(false)}
+                style={{ width:"100%", padding:12, borderRadius:12, border:"1px solid #252530",
+                  background:"none", color:"#6B6878", fontSize:14, fontWeight:600, cursor:"pointer" }}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Messages panel */}
+      {showMessages && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.8)", zIndex:500,
+          backdropFilter:"blur(6px)", display:"flex", alignItems:"flex-end", justifyContent:"center" }}
+          onClick={e => { if (e.target===e.currentTarget) { setShowMessages(false); refreshUnread(); } }}>
+          <div style={{ background:"#0A0A0C", width:"100%", maxWidth:430,
+            height:"88vh", borderRadius:"20px 20px 0 0",
+            border:"1px solid #252530", display:"flex", flexDirection:"column",
+            animation:"slideUp .25s ease" }}>
+            {/* Sheet header */}
+            <div style={{ padding:"14px 16px 0", flexShrink:0 }}>
+              <div style={{ width:36, height:4, borderRadius:2, background:"#252530", margin:"0 auto 14px" }} />
+            </div>
+            <div style={{ flex:1, overflowY:"auto" }}>
+              <MessagesScreen />
+            </div>
+            <div style={{ padding:"12px 16px", borderTop:"1px solid #252530", flexShrink:0 }}>
+              <button onClick={() => { setShowMessages(false); refreshUnread(); }}
                 style={{ width:"100%", padding:12, borderRadius:12, border:"1px solid #252530",
                   background:"none", color:"#6B6878", fontSize:14, fontWeight:600, cursor:"pointer" }}>
                 Close
