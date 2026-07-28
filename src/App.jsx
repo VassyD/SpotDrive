@@ -3517,7 +3517,7 @@ function ProfileScreen() {
           </div>
         </div>
 
-       <div style={{ display:"grid", gridTemplateColumns:`repeat(${profile?.is_private ? 4 : 3},1fr)`, borderTop:"1px solid #252530", paddingTop:14 }}>
+       <div style={{ display:"grid", gridTemplateColumns:`repeat(${profile?.is_private ? 4 : 3},1fr)`, gap:4, borderTop:"1px solid #252530", paddingTop:14 }}>
           {[["Spots",spots.length,null],["Followers",profile?.followers_count||0,"followers"],["Following",profile?.following_count||0,"following"],...(profile?.is_private ? [["Requests", requestCount, "requests"]] : [])].map(([label,value,listType]) => (
             <div key={label} onClick={() => { if (listType==="requests") setShowRequests(true); else if (listType) setShowFollowList(listType); }}
               style={{ textAlign:"center", cursor: listType ? "pointer" : "default", position:"relative" }}>
