@@ -85,6 +85,7 @@ jobs:
           npx vitest run tests/integration/mentions-live.test.ts
           npx vitest run tests/integration/privacy-settings-live.test.ts
           npx vitest run tests/integration/direct-messages-live.test.ts
+          npx vitest run tests/integration/private-account-live.test.ts
           npx vitest run tests/integration/comment-editing-live.test.ts
           npx vitest run tests/integration/comment-threading-live.test.ts
 
