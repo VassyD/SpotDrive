@@ -924,7 +924,7 @@ function SettingsSheet({ onClose, onEditProfile, onChangePhoto, onPrivacy, onNot
           border:"1px solid #252530", display:"flex", alignItems:"center", gap:12 }}>
           <Avatar initials={profile?.handle?.slice(0,2).toUpperCase()||"?"} src={profile?.avatar_url} size={44} />
           <div>
-            <div style={{ fontSize:14, fontWeight:700, color:"#F2EEE8" }}>@{profile?.handle}</div>
+            <div style={{ fontSize:14, fontWeight:700, color:"#F2EEE8" }}>{profile?.display_name || profile?.handle}</div>
             <div style={{ fontSize:12, color:"#6B6878" }}>{user?.email}</div>
           </div>
         </div>
@@ -3509,7 +3509,7 @@ function ProfileScreen() {
           </div>
           <div>
             <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:22, fontWeight:900, color:"#F2EEE8" }}>
-              @{profile?.handle}
+              {profile?.display_name || profile?.handle}
             </div>
             <div style={{ fontSize:13, color:"#6B6878" }}>@{profile?.handle}</div>
             {profile?.bio && <div style={{ fontSize:12, color:"#AAA6A0", marginTop:4, maxWidth:260, lineHeight:1.4 }}>{profile.bio}</div>}
