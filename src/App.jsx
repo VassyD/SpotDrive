@@ -574,7 +574,10 @@ const handleReport = async (reason) => {
           <Avatar initials={spot.user?.initials} src={spot.user?.avatar_url} size={28} />
           <div style={{ flex:1, minWidth:0 }}>
             <div onClick={e => { e.stopPropagation(); onUserTap?.(spot.user?.handle); }}
-              style={{ fontSize:12, fontWeight:600, color:"#F2EEE8", cursor:"pointer" }}>@{spot.user?.handle}</div>
+              style={{ fontSize:12, fontWeight:600, color:"#F2EEE8", cursor:"pointer", display:"flex", alignItems:"baseline", gap:4, overflow:"hidden" }}>
+              <span style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{spot.user?.display_name || spot.user?.handle}</span>
+              <span style={{ fontSize:11, fontWeight:400, color:"#6B6878", flexShrink:0 }}>@{spot.user?.handle}</span>
+            </div>
             <div style={{ fontSize:10, color:"#6B6878" }}>{spot.location} · {spot.time}</div>
           </div>
         </div>
@@ -1984,7 +1987,7 @@ function StoriesRow({ profile, onAddStory }) {
     const load = async () => {
       const { data } = await supabase
         .from("stories")
-        .select("*, profiles(handle, avatar_url)")
+        .select("*, profiles(handle, avatar_url, display_name)")
         .gt("expires_at", new Date().toISOString())
         .order("created_at", { ascending: false })
         .limit(20);
@@ -2573,6 +2576,7 @@ const bottomRef   = useRef(null);
     saved:    false,
     user: {
       handle:    s.profiles?.handle     || "spotter",
+      display_name: s.profiles?.display_name || s.profiles?.handle || "spotter",
       avatar_url:s.profiles?.avatar_url,
       initials:  (s.profiles?.handle    || "SP").slice(0,2).toUpperCase(),
     },
@@ -2603,7 +2607,7 @@ const bottomRef   = useRef(null);
     const load = async () => {
       const data = await cachedFetch("feed-page-0", async () => {
         const { data } = await supabase.from("spots")
-          .select("*, profiles(handle, avatar_url)")
+          .select("*, profiles(handle, avatar_url, display_name)")
           .eq("status", "live")
           .order("created_at", { ascending: false })
           .range(0, PAGE_SIZE - 1);
@@ -2635,7 +2639,7 @@ const bottomRef   = useRef(null);
       }, async (payload) => {
         // Fetch full spot with profile
         const { data } = await supabase.from("spots")
-          .select("*, profiles(handle, avatar_url)")
+          .select("*, profiles(handle, avatar_url, display_name)")
           .eq("id", payload.new.id)
           .single();
         if (data) {
@@ -2674,7 +2678,7 @@ const bottomRef   = useRef(null);
     const to   = from + PAGE_SIZE - 1;
 
     const { data } = await supabase.from("spots")
-      .select("*, profiles(handle, avatar_url)")
+      .select("*, profiles(handle, avatar_url, display_name)")
       .eq("status", "live")
       .order("created_at", { ascending: false })
       .range(from, to);
@@ -3135,7 +3139,7 @@ function SpotterProfileSheet({ handle, onClose }) {
                   <Avatar initials={spotter.handle?.slice(0,2).toUpperCase()||"?"} src={spotter.avatar_url} size={64} ring />
                   <div style={{ flex:1 }}>
                     <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:20, fontWeight:900, color:"#F2EEE8" }}>
-                      @{spotter.handle}
+                      {spotter.display_name || spotter.handle}
                     </div>
                     <div style={{ fontSize:12, color:"#6B6878", marginBottom:8 }}>@{spotter.handle}</div>
                     {spotter.is_private && (
@@ -3265,7 +3269,7 @@ function ExploreScreen({ onSpotTap }) {
     if (tab !== "spots") return;
     setLoadingSpots(true);
     supabase.from("spots")
-      .select("*, profiles(handle, avatar_url)")
+      .select("*, profiles(handle, avatar_url, display_name)")
       .eq("status", "live")
       .order("created_at", { ascending: false })
       .limit(60)
@@ -3898,7 +3902,7 @@ function NotificationsScreen() {  const { user, profile } = useAuth();
     const load = async () => {
       const { data, error } = await supabase
         .from("notifications")
-        .select("*, actor:profiles!notifications_actor_id_fkey(handle, avatar_url), spot:spots(make, model)")
+        .select("*, actor:profiles!notifications_actor_id_fkey(handle, avatar_url, display_name), spot:spots(make, model)")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(50);
@@ -3919,6 +3923,7 @@ function NotificationsScreen() {  const { user, profile } = useAuth();
           read: n.read,
           created_at: n.created_at,
           actor_handle: handle,
+          actor_display_name: n.actor?.display_name || handle,
           actor_initials: handle.slice(0, 2).toUpperCase(),
           text,
           spot_make: n.spot?.make || null,
@@ -4059,7 +4064,8 @@ function NotificationsScreen() {  const { user, profile } = useAuth();
                 {/* Content */}
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:13, color:"#F2EEE8", lineHeight:1.45, marginBottom:3 }}>
-                    <span style={{ fontWeight:700 }}>@{n.actor_handle}</span>
+                    <span style={{ fontWeight:700 }}>{n.actor_display_name || n.actor_handle}</span>
+                    {" "}<span style={{ fontWeight:500, color:"#6B6878" }}>@{n.actor_handle}</span>
                     {" "}<span style={{ color: n.read ? "#AAA6A0" : "#F2EEE8" }}>{n.text}</span>
                   </div>
                   <div style={{ display:"flex", alignItems:"center", gap:6 }}>
@@ -4645,7 +4651,7 @@ function CommentRow({ comment: c, user, profile, timeAgo, onReply, onDelete, rep
       <Avatar initials={c.initials} src={c.avatar_url} size={34} />
       <div style={{ flex:1, minWidth:0 }}>
         <div style={{ display:"flex", alignItems:"baseline", gap:6, marginBottom:3 }}>
-          <span style={{ fontSize:13, fontWeight:700, color:"#F2EEE8" }}>@{c.handle}</span>
+          <span style={{ fontSize:13, fontWeight:700, color:"#F2EEE8" }}>{c.display_name || c.handle}</span>{" "}<span style={{ fontSize:11, fontWeight:500, color:"#6B6878" }}>@{c.handle}</span>
           <span style={{ fontSize:10, color:"#6B6878" }}>{timeAgo(c.created_at)}</span>
           {editedAt && <span style={{ fontSize:10, color:"#6B6878" }}>(edited)</span>}
           {c.optimistic && <span style={{ fontSize:10, color:"#6B6878" }}>sending…</span>}
@@ -4865,7 +4871,7 @@ function CommentsSheet({ spot, onClose }) {
     const load = async () => {
       const { data } = await supabase
         .from("comments")
-        .select("*, profiles(handle, avatar_url)")
+        .select("*, profiles(handle, avatar_url, display_name)")
         .eq("spot_id", spot.id)
         .order("created_at", { ascending: true })
         .limit(100);
@@ -4874,6 +4880,7 @@ function CommentsSheet({ spot, onClose }) {
         (data || []).map(c => ({
           ...c,
           handle:     c.profiles?.handle || "spotter",
+          display_name: c.profiles?.display_name || c.profiles?.handle || "spotter",
           avatar_url: c.profiles?.avatar_url,
           initials:   (c.profiles?.handle || "SP").slice(0,2).toUpperCase(),
         }))
@@ -4906,6 +4913,7 @@ function CommentsSheet({ spot, onClose }) {
       id: `temp-${Date.now()}`,
       text: text.trim(),
       handle: profile?.handle || "you",
+      display_name: profile?.display_name || profile?.handle || "you",
       avatar_url: profile?.avatar_url,
       initials: (profile?.handle || "YO").slice(0,2).toUpperCase(),
       created_at: new Date().toISOString(),
@@ -4926,7 +4934,7 @@ function CommentsSheet({ spot, onClose }) {
         user_id:    user.id,
         text:       optimistic.text,
         parent_comment_id: wasReplyingTo,
-      }).select("*, profiles(handle, avatar_url)").single();
+      }).select("*, profiles(handle, avatar_url, display_name)").single();
 
       if (error) throw error;
 
@@ -4934,6 +4942,7 @@ function CommentsSheet({ spot, onClose }) {
       setComments(cs => cs.map(c => c.id === optimistic.id ? {
         ...data,
         handle:     data.profiles?.handle || profile?.handle || "spotter",
+        display_name: data.profiles?.display_name || profile?.display_name || profile?.handle || "spotter",
         avatar_url: data.profiles?.avatar_url || profile?.avatar_url,
         initials:   (data.profiles?.handle || profile?.handle || "SP").slice(0,2).toUpperCase(),
       } : c));
