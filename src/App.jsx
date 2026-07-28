@@ -2821,16 +2821,108 @@ function FollowListSheet({ userId, type, onClose, onViewProfile }) {
     </div>
   );
 }
+// ─── FOLLOW REQUESTS SHEET ────────────────────────────────────
+function FollowRequestsSheet({ userId, onClose, onViewProfile }) {
+  const [list, setList] = useState(null);
+  const [processingId, setProcessingId] = useState(null);
+
+  const load = async () => {
+    const { data } = await supabase.from("follow_requests")
+      .select("id, requester:profiles!follow_requests_requester_id_fkey(id, handle, avatar_url)")
+      .eq("target_id", userId);
+    setList((data || []).filter(r => r.requester));
+  };
+  useEffect(() => { load(); }, [userId]);
+
+  const accept = async (requestId) => {
+    setProcessingId(requestId);
+    const { error } = await supabase.rpc("accept_follow_request", { request_id: requestId });
+    setProcessingId(null);
+    if (error) { console.error(error); return; }
+    setList(l => l.filter(r => r.id !== requestId));
+  };
+
+  const deny = async (requestId) => {
+    setProcessingId(requestId);
+    const { error } = await supabase.from("follow_requests").delete().eq("id", requestId);
+    setProcessingId(null);
+    if (error) { console.error(error); return; }
+    setList(l => l.filter(r => r.id !== requestId));
+  };
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.85)", zIndex:850,
+      backdropFilter:"blur(6px)", display:"flex", alignItems:"flex-end", justifyContent:"center" }}
+      onClick={e => { if (e.target===e.currentTarget) onClose(); }}>
+      <div style={{ background:"#0A0A0C", width:"100%", maxWidth:430,
+        height:"80vh", borderRadius:"20px 20px 0 0", border:"1px solid #252530",
+        display:"flex", flexDirection:"column", animation:"slideUp .25s ease" }}>
+        <div style={{ padding:"14px 16px 0", flexShrink:0 }}>
+          <div style={{ width:36, height:4, borderRadius:2, background:"#252530", margin:"0 auto 14px" }} />
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+            <button onClick={onClose}
+              style={{ width:32, height:32, borderRadius:"50%", background:"#18181F",
+                border:"1px solid #252530", display:"flex", alignItems:"center",
+                justifyContent:"center", color:"#6B6878", fontSize:18, cursor:"pointer" }}>
+              ‹
+            </button>
+            <span style={{ fontSize:16, fontWeight:800, color:"#F2EEE8" }}>Follow Requests</span>
+          </div>
+        </div>
+        <div style={{ flex:1, overflowY:"auto", padding:"0 16px 16px" }}>
+          {list === null ? (
+            <div style={{ display:"flex", justifyContent:"center", padding:40 }}><Spinner size={24} /></div>
+          ) : list.length === 0 ? (
+            <div style={{ textAlign:"center", padding:"60px 20px" }}>
+              <div style={{ fontSize:36, marginBottom:10 }}>👋</div>
+              <div style={{ fontSize:14, color:"#6B6878" }}>No pending requests</div>
+            </div>
+          ) : (
+            list.map(r => (
+              <div key={r.id} style={{ display:"flex", alignItems:"center", gap:12,
+                padding:"10px 0", borderBottom:"1px solid #252530" }}>
+                <div onClick={() => onViewProfile(r.requester.handle)} style={{ display:"flex", alignItems:"center", gap:12, flex:1, cursor:"pointer" }}>
+                  <Avatar initials={(r.requester.handle||"SP").slice(0,2).toUpperCase()} src={r.requester.avatar_url} size={44} />
+                  <div style={{ fontSize:14, fontWeight:700, color:"#F2EEE8" }}>@{r.requester.handle}</div>
+                </div>
+                <button onClick={() => deny(r.id)} disabled={processingId===r.id}
+                  style={{ padding:"6px 12px", borderRadius:99, fontSize:11, fontWeight:700,
+                    background:"none", border:"1px solid #252530", color:"#6B6878", cursor:"pointer" }}>
+                  Deny
+                </button>
+                <button onClick={() => accept(r.id)} disabled={processingId===r.id}
+                  style={{ padding:"6px 12px", borderRadius:99, fontSize:11, fontWeight:700,
+                    background:"#E8430A", border:"1px solid #E8430A", color:"#fff", cursor:"pointer",
+                    display:"flex", alignItems:"center", gap:4 }}>
+                  {processingId===r.id ? <Spinner size={10} color="#fff" /> : "Accept"}
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FollowButton({ targetUserId, targetHandle, size="md" }) {
   const { user } = useAuth();
   const [following,  setFollowing]  = useState(null); // null = loading
+  const [pending, setPending] = useState(false);
+  const [isPrivate, setIsPrivate] = useState(false);
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     if (!user || !targetUserId || user.id === targetUserId) return;
-    supabase.from("follows")
-      .select("id").eq("follower_id", user.id).eq("following_id", targetUserId).maybeSingle()
-      .then(({ data }) => setFollowing(!!data));
+    Promise.all([
+      supabase.from("follows").select("id").eq("follower_id", user.id).eq("following_id", targetUserId).maybeSingle(),
+      supabase.from("follow_requests").select("id").eq("requester_id", user.id).eq("target_id", targetUserId).maybeSingle(),
+      supabase.from("profiles").select("is_private").eq("id", targetUserId).maybeSingle(),
+    ]).then(([followRes, requestRes, profileRes]) => {
+      setFollowing(!!followRes.data);
+      setPending(!!requestRes.data);
+      setIsPrivate(!!profileRes.data?.is_private);
+    });
   }, [user, targetUserId]);
 
  const toggle = async (e) => {
@@ -2845,6 +2937,16 @@ function FollowButton({ targetUserId, targetHandle, size="md" }) {
           .delete().eq("follower_id", user.id).eq("following_id", targetUserId);
         if (error) throw error;
         setFollowing(false);
+      } else if (pending) {
+        const { error } = await supabase.from("follow_requests")
+          .delete().eq("requester_id", user.id).eq("target_id", targetUserId);
+        if (error) throw error;
+        setPending(false);
+      } else if (isPrivate) {
+        const { error } = await supabase.from("follow_requests")
+          .insert({ requester_id: user.id, target_id: targetUserId });
+        if (error) throw error;
+        setPending(true);
       } else {
         const { error } = await supabase.from("follows")
           .insert({ follower_id: user.id, following_id: targetUserId });
@@ -2864,19 +2966,21 @@ function FollowButton({ targetUserId, targetHandle, size="md" }) {
   );
 
   const sm = size === "sm";
+  const label = following ? "Following" : pending ? "Requested" : isPrivate ? "Request" : "Follow";
+  const isNeutral = following || pending;
   return (
     <button onClick={toggle} disabled={processing}
-      aria-label={following ? `Unfollow @${targetHandle}` : `Follow @${targetHandle}`}
+      aria-label={following ? `Unfollow @${targetHandle}` : pending ? `Cancel request to @${targetHandle}` : `Follow @${targetHandle}`}
       style={{ padding: sm?"5px 14px":"8px 20px",
         borderRadius:99, fontSize: sm?11:13, fontWeight:700,
-        background: following ? "none" : "#E8430A",
-        border: following ? "1px solid #252530" : "1px solid #E8430A",
-        color: following ? "#6B6878" : "#fff",
+        background: isNeutral ? "none" : "#E8430A",
+        border: isNeutral ? "1px solid #252530" : "1px solid #E8430A",
+        color: isNeutral ? "#6B6878" : "#fff",
         cursor: processing ? "not-allowed" : "pointer",
         opacity: processing ? 0.7 : 1,
         transition:"all .15s", display:"flex", alignItems:"center", gap:4 }}>
-      {processing ? <Spinner size={10} color={following?"#6B6878":"#fff"} /> : null}
-      {following ? "Following" : "Follow"}
+      {processing ? <Spinner size={10} color={isNeutral?"#6B6878":"#fff"} /> : null}
+      {label}
     </button>
   );
 }
@@ -3034,6 +3138,11 @@ function SpotterProfileSheet({ handle, onClose }) {
                       @{spotter.handle}
                     </div>
                     <div style={{ fontSize:12, color:"#6B6878", marginBottom:8 }}>@{spotter.handle}</div>
+                    {spotter.is_private && (
+                      <div style={{ fontSize:11, color:"#6B6878", display:"flex", alignItems:"center", gap:4, marginBottom:6 }}>
+                        🔒 Private account
+                      </div>
+                    )}
                     {spotter.bio && <div style={{ fontSize:12, color:"#AAA6A0", lineHeight:1.4, marginBottom:8 }}>{spotter.bio}</div>}
                     <div style={{ display:"flex", gap:8 }}>
                       <FollowButton targetUserId={spotter.id} targetHandle={spotter.handle} />
@@ -3323,8 +3432,16 @@ function ProfileScreen() {
   const [editingSpot,       setEditingSpot]       = useState(null);
   const [showAdmin,         setShowAdmin]         = useState(false);
   const [showFollowList, setShowFollowList] = useState(null);
+  const [showRequests, setShowRequests] = useState(false);
+  const [requestCount, setRequestCount] = useState(0);
   const [viewProfile, setViewProfile] = useState(null);
   const avatarRef = useRef(null);
+
+  useEffect(() => {
+    if (!user || !profile?.is_private) return;
+    supabase.from("follow_requests").select("id", { count:"exact", head:true }).eq("target_id", user.id)
+      .then(({ count }) => setRequestCount(count || 0));
+  }, [user, profile?.is_private, showRequests]);
 
   useEffect(() => {
     if (!user) return;
@@ -3400,12 +3517,15 @@ function ProfileScreen() {
           </div>
         </div>
 
-       <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", borderTop:"1px solid #252530", paddingTop:14 }}>
-          {[["Spots",spots.length,null],["Followers",profile?.followers_count||0,"followers"],["Following",profile?.following_count||0,"following"]].map(([label,value,listType]) => (
-            <div key={label} onClick={() => listType && setShowFollowList(listType)}
-              style={{ textAlign:"center", cursor: listType ? "pointer" : "default" }}>
+       <div style={{ display:"grid", gridTemplateColumns:`repeat(${profile?.is_private ? 4 : 3},1fr)`, borderTop:"1px solid #252530", paddingTop:14 }}>
+          {[["Spots",spots.length,null],["Followers",profile?.followers_count||0,"followers"],["Following",profile?.following_count||0,"following"],...(profile?.is_private ? [["Requests", requestCount, "requests"]] : [])].map(([label,value,listType]) => (
+            <div key={label} onClick={() => { if (listType==="requests") setShowRequests(true); else if (listType) setShowFollowList(listType); }}
+              style={{ textAlign:"center", cursor: listType ? "pointer" : "default", position:"relative" }}>
               <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:22, fontWeight:900, color:"#F2EEE8" }}>{value}</div>
               <div style={{ fontSize:10, color:"#6B6878", textTransform:"uppercase", letterSpacing:".05em" }}>{label}</div>
+              {listType==="requests" && value>0 && (
+                <div style={{ position:"absolute", top:-4, right:"30%", width:8, height:8, borderRadius:"50%", background:"#E8430A" }} />
+              )}
             </div>
           ))}
         </div>
@@ -3454,6 +3574,11 @@ function ProfileScreen() {
         <FollowListSheet userId={user.id} type={showFollowList}
           onClose={() => setShowFollowList(null)}
           onViewProfile={(h) => { setShowFollowList(null); setViewProfile(h); }} />
+      )}
+      {showRequests && (
+        <FollowRequestsSheet userId={user.id}
+          onClose={() => setShowRequests(false)}
+          onViewProfile={(h) => { setShowRequests(false); setViewProfile(h); }} />
       )}
       {viewProfile && (
         <SpotterProfileSheet handle={viewProfile} onClose={() => setViewProfile(null)} />
