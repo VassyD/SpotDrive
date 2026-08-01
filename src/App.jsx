@@ -4625,13 +4625,19 @@ function CommentRow({ comment: c, user, profile, timeAgo, onReply, onDelete, rep
     setEditedAt(new Date().toISOString());
     setIsEditing(false);
   };
-  const handleLike = () => {    const next = !liked;
+  const handleLike = async () => {
+    const next = !liked;
     setLiked(next);
     setLikes(n => next ? n+1 : n-1);
     if (!c.optimistic) {
-      supabase.from("comments")
+      const { error } = await supabase.from("comments")
         .update({ likes_count: next ? likes+1 : likes-1 })
-        .eq("id", c.id).catch(console.error);
+        .eq("id", c.id);
+      if (error) {
+        console.error(error);
+        setLiked(!next);
+        setLikes(n => !next ? n+1 : n-1);
+      }
     }
   };
   const handleReportComment = async (reason) => {
