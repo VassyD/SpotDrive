@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, memo, createContext, useContext } from "react";
 import { createClient } from "@supabase/supabase-js";
 import * as Sentry from "@sentry/react";
+import { timeAgo, cachedFetch, invalidateCache } from "./lib/utils";
 
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -2525,17 +2526,8 @@ const imgUrl = (url, w = 600) => {
 };
 
 // ─── QUERY CACHE ──────────────────────────────────────────────
-// Simple in-memory cache so switching tabs doesn't refetch
-const queryCache = new Map();
-const CACHE_TTL = 60000; // 1 minute
-
-const cachedFetch = async (key, fetcher) => {
-  const cached = queryCache.get(key);
-  if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
-  const data = await fetcher();
-  queryCache.set(key, { data, ts: Date.now() });
-  return data;
-};
+// Now provided by lib/utils.ts (imported above) — was previously
+// duplicated here as a completely separate, disconnected cache.
 
 const PAGE_SIZE = 10;
 
@@ -2558,7 +2550,7 @@ const bottomRef   = useRef(null);
       const blockedId = e.detail?.blockedId;
       if (!blockedId) return;
       setSpots(prev => prev.filter(s => s.user_id !== blockedId));
-      queryCache.delete("feed-page-0");
+      invalidateCache("feed-page-0");
     };
     window.addEventListener("spotdrive:blocked", handleBlocked);
     return () => window.removeEventListener("spotdrive:blocked", handleBlocked);
@@ -2582,14 +2574,6 @@ const bottomRef   = useRef(null);
     },
   });
 
-  const timeAgo = (ts) => {
-    if (!ts) return "";
-    const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
-    if (m < 1)    return "just now";
-    if (m < 60)   return `${m}m ago`;
-    if (m < 1440) return `${Math.floor(m/60)}h ago`;
-    return `${Math.floor(m/1440)}d ago`;
-  };
   const applyLikedSaved = async (mapped) => {
     if (!user || mapped.length === 0) return mapped;
     const ids = mapped.map(s => s.id);
@@ -2645,7 +2629,7 @@ const bottomRef   = useRef(null);
         if (data) {
           setSpots(prev => [mapSpot(data), ...prev]);
           // Invalidate cache
-          queryCache.delete("feed-page-0");
+          invalidateCache("feed-page-0");
         }
       })
       .subscribe();
@@ -3041,7 +3025,7 @@ function SpotterProfileSheet({ handle, onClose }) {
     setBlocking(false);
     if (error) { console.error(error); return; }
     window.dispatchEvent(new CustomEvent("spotdrive:blocked", { detail: { blockedId: spotter.id } }));
-    queryCache.delete("feed-page-0");
+    invalidateCache("feed-page-0");
     setShowReportMenu(false);
     onClose();
   };
@@ -3651,14 +3635,7 @@ function MessagesScreen({ directOpen, onDirectOpenHandled }) {
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
 
-  const timeAgo = (ts) => {
-    if (!ts) return "";
-    const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
-    if (m < 1) return "just now";
-    if (m < 60) return `${m}m`;
-    if (m < 1440) return `${Math.floor(m/60)}h`;
-    return `${Math.floor(m/1440)}d`;
-  };
+
 
   if (loading) return (
     <div style={{ display:"flex", justifyContent:"center", padding:40 }}>
@@ -3800,13 +3777,7 @@ function ConversationView({ conversation, currentUserId, onClose }) {
     finally { setUploadingPhoto(false); }
   };
 
-  const timeAgo = (ts) => {
-    const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
-    if (m < 1) return "just now";
-    if (m < 60) return `${m}m`;
-    if (m < 1440) return `${Math.floor(m/60)}h`;
-    return `${Math.floor(m/1440)}d`;
-  };
+
 
   return (
     <div style={{ position:"fixed", inset:0, background:"#0A0A0C", zIndex:600, display:"flex", flexDirection:"column" }}>
@@ -3936,13 +3907,7 @@ function NotificationsScreen() {  const { user, profile } = useAuth();
     load();
   }, [user]);
 
-  const timeAgo = (ts) => {
-    const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
-    if (m < 1)    return "just now";
-    if (m < 60)   return `${m}m`;
-    if (m < 1440) return `${Math.floor(m/60)}h`;
-    return `${Math.floor(m/1440)}d`;
-  };
+
 
   const markAllRead = async () => {
     setNotifs(ns => ns.map(n => ({ ...n, read:true })));
@@ -4867,11 +4832,7 @@ function CommentsSheet({ spot, onClose }) {
   const inputRef  = useRef(null);
   const bottomRef = useRef(null);
 
-    const timeAgo = (ts) => {
-    const m = Math.floor((Date.now()-new Date(ts).getTime())/60000);
-    if (m<1) return "just now"; if (m<60) return `${m}m`;
-    if (m<1440) return `${Math.floor(m/60)}h`; return `${Math.floor(m/1440)}d`;
-  };
+
 
   useEffect(() => {
     const load = async () => {

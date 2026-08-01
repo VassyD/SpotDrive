@@ -36,17 +36,17 @@ describe("timeAgo", () => {
     const ts = new Date(Date.now() - 5 * 60_000).toISOString();
     vi.useRealTimers();
     const result = timeAgo(new Date(Date.now() - 5 * 60_000).toISOString());
-    expect(result).toMatch(/m ago/);
+    expect(result).toMatch(/^\d+m$/);
   });
 
   it("returns hours ago for < 1 day", () => {
     const ts = new Date(Date.now() - 2 * 3_600_000).toISOString();
-    expect(timeAgo(ts)).toBe("2h ago");
+    expect(timeAgo(ts)).toBe("2h");
   });
 
   it("returns days ago for >= 1 day", () => {
     const ts = new Date(Date.now() - 3 * 86_400_000).toISOString();
-    expect(timeAgo(ts)).toBe("3d ago");
+    expect(timeAgo(ts)).toBe("3d");
   });
 
   it("returns empty string for null/undefined", () => {

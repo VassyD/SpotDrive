@@ -10,9 +10,9 @@ export const timeAgo = (ts: string | null | undefined): string => {
   if (!ts) return "";
   const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60_000);
   if (m < 1)    return "just now";
-  if (m < 60)   return `${m}m ago`;
-  if (m < 1440) return `${Math.floor(m / 60)}h ago`;
-  return `${Math.floor(m / 1440)}d ago`;
+  if (m < 60)   return `${m}m`;
+  if (m < 1440) return `${Math.floor(m / 60)}h`;
+  return `${Math.floor(m / 1440)}d`;
 };
 
 // ─── Image Optimisation ───────────────────────────────────────
