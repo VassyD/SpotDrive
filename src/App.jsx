@@ -89,7 +89,7 @@ function AuthProvider({ children }) {
     return () => subscription.unsubscribe();
   }, [fetchProfile]);
 
-  const signUp = useCallback(async ({ email, password, handle, displayName, dob, town, state, country, captchaToken }) => {
+  const signUp = useCallback(async ({ email, password, handle, displayName, dob, town, state, country, captchaToken, utmSource, utmMedium, utmCampaign }) => {
      const { data: existing } = await supabase.from("profiles").select("handle").eq("handle", handle.toLowerCase()).maybeSingle();
     if (existing) throw new Error("That handle is already taken.");
     const { data, error } = await supabase.auth.signUp({
@@ -97,6 +97,7 @@ function AuthProvider({ children }) {
       options: { data: {
         handle: handle.toLowerCase(), display_name: displayName,
         date_of_birth: dob || "", town: town || "", state: state || "", country: country || "",
+        utm_source: utmSource || "", utm_medium: utmMedium || "", utm_campaign: utmCampaign || "",
       }, captchaToken }
     });
     if (error) throw error;
@@ -312,6 +313,32 @@ function LoginForm({ onSwitch }) {
   );
 }
 
+// -- ANALYTICS: UTM + anon-id capture --------------------------
+function getOrCreateAnonId() {
+  let id = localStorage.getItem("sd_anon_id");
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem("sd_anon_id", id);
+  }
+  return id;
+}
+function getUtmParams() {
+  const stored = localStorage.getItem("sd_utm");
+  if (stored) {
+    try { return JSON.parse(stored); } catch (e) { /* fall through to re-parse from URL */ }
+  }
+  const params = new URLSearchParams(window.location.search);
+  const utm = {
+    utm_source: params.get("utm_source") || null,
+    utm_medium: params.get("utm_medium") || null,
+    utm_campaign: params.get("utm_campaign") || null,
+  };
+  if (utm.utm_source || utm.utm_medium || utm.utm_campaign) {
+    localStorage.setItem("sd_utm", JSON.stringify(utm));
+  }
+  return utm;
+}
+
 function SignupForm({ onSwitch }) {
   const { signUp } = useAuth();
   const [form, setForm] = useState({ email:"", password:"", confirm:"", handle:"", name:"", dob:"", town:"", state:"", country:"" });
@@ -321,6 +348,16 @@ function SignupForm({ onSwitch }) {
   const update = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
 
   const [captchaToken, setCaptchaToken] = useState("");
+
+  useEffect(() => {
+    const utm = getUtmParams();
+    supabase.from("events").insert({
+      event_type: "signup_started",
+      anon_id: getOrCreateAnonId(),
+      ...utm,
+    }).then(({ error }) => { if (error) console.error("analytics (non-blocking):", error); });
+  }, []);
+
   const handle = async (e) => {
     e.preventDefault(); setError("");
     if (form.password !== form.confirm) { setError("Passwords don't match."); return; }
@@ -333,9 +370,11 @@ function SignupForm({ onSwitch }) {
     if (ageYears < 16) { setError("You must be at least 16 years old to sign up."); return; }
     setLoading(true);
     try {
+      const utm = getUtmParams();
       await signUp({
         email:form.email, password:form.password, handle:form.handle, displayName:form.name||form.handle,
         dob:form.dob, town:form.town, state:form.state, country:form.country, captchaToken,
+        utmSource: utm.utm_source, utmMedium: utm.utm_medium, utmCampaign: utm.utm_campaign,
       });
       setSuccess(true);
     } catch (err) { setError(err.message); }
