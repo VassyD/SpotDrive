@@ -2621,18 +2621,20 @@ const bottomRef   = useRef(null);
         table:  "spots",
         filter: "status=eq.live",
       }, async (payload) => {
+        console.log("DEBUG: realtime INSERT event received", payload);
         // Fetch full spot with profile
-        const { data } = await supabase.from("spots")
+        const { data, error } = await supabase.from("spots")
           .select("*, profiles(handle, avatar_url, display_name)")
           .eq("id", payload.new.id)
           .single();
+        console.log("DEBUG: fetched spot after realtime event", { data, error });
         if (data) {
           setSpots(prev => [mapSpot(data), ...prev]);
           // Invalidate cache
           invalidateCache("feed-page-0");
         }
       })
-      .subscribe();
+      .subscribe((status) => console.log("DEBUG: realtime subscription status:", status));
 
     return () => {
       if (channelRef.current) supabase.removeChannel(channelRef.current);
