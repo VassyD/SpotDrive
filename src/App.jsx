@@ -2544,6 +2544,7 @@ function FeedScreen({ onSpotTap }) {
   );
 const bottomRef   = useRef(null);
   const channelRef  = useRef(null);
+  const [reconnectTick, setReconnectTick] = useState(0);
   const [viewProfile, setViewProfile] = useState(null);
   useEffect(() => {
     const handleBlocked = (e) => {
@@ -2634,12 +2635,17 @@ const bottomRef   = useRef(null);
           invalidateCache("feed-page-0");
         }
       })
-      .subscribe((status) => console.log("DEBUG: realtime subscription status:", status));
+      .subscribe((status) => {
+        console.log("DEBUG: realtime subscription status:", status);
+        if (status === "CLOSED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          setTimeout(() => setReconnectTick(t => t + 1), 2000);
+        }
+      });
 
     return () => {
       if (channelRef.current) supabase.removeChannel(channelRef.current);
     };
-  }, []);
+  }, [reconnectTick]);
 
   // ── Infinite scroll observer ─────────────────────────────────
   useEffect(() => {
