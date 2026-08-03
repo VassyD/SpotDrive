@@ -12,7 +12,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
 
 const T = {
   bg:"#0A0A0C", surface:"#14141A", surfaceHi:"#1C1C24", card:"#18181F",
-  border:"#252530", accent:"#E8430A", accentDk:"#BF360C", accentDm:"#2D1200",
+  border:"#252530", accent:"#00A19C", accentDk:"#C6C6C6", accentDm:"#2D1200",
   gold:"#C9A84C", green:"#22C55E", blue:"#3B82F6", danger:"#EF4444",
   text:"#F2EEE8", sub:"#AAA6A0", muted:"#6B6878", faint:"#3D3D4E",
 };
@@ -24,12 +24,12 @@ body{background:#0A0A0C;font-family:'Inter',sans-serif;color:#F2EEE8;-webkit-fon
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:#0A0A0C}
 ::-webkit-scrollbar-thumb{background:#252530;border-radius:2px}
 button{cursor:pointer;font-family:inherit}input,textarea{font-family:inherit;outline:none}
-:focus-visible{outline:2px solid #E8430A;outline-offset:2px;border-radius:4px}
+:focus-visible{outline:2px solid #00A19C;outline-offset:2px;border-radius:4px}
 @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes shimmer{from{background-position:-600px 0}to{background-position:600px 0}}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-@keyframes glow{0%,100%{box-shadow:0 0 0 0 #E8430A40}50%{box-shadow:0 0 20px 6px #E8430A25}}
+@keyframes glow{0%,100%{box-shadow:0 0 0 0 #00A19C40}50%{box-shadow:0 0 20px 6px #00A19C25}}
 @keyframes heartPop{0%{transform:scale(1)}50%{transform:scale(1.45)}100%{transform:scale(1)}}
 .fade-up{animation:fadeUp .35s ease both}
 .spin{animation:spin .7s linear infinite}
@@ -37,16 +37,16 @@ button{cursor:pointer;font-family:inherit}input,textarea{font-family:inherit;out
 .heart-pop{animation:heartPop .3s ease}
 .glow{animation:glow 3s ease-in-out infinite}
 .spot-card{background:#18181F;border:1px solid #252530;border-radius:16px;overflow:hidden;transition:transform .2s,box-shadow .2s}
-.spot-card:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(232,67,10,.15)}
+.spot-card:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,161,156,.15)}
 .nav-item{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 12px;color:#6B6878;font-size:10px;font-weight:600;transition:color .15s;border:none;background:none;cursor:pointer}
-.nav-item.active{color:#E8430A}
-.story-ring{border-radius:50%;padding:2px;background:linear-gradient(135deg,#E8430A,#C9A84C)}
+.nav-item.active{color:#00A19C}
+.story-ring{border-radius:50%;padding:2px;background:linear-gradient(135deg,#00A19C,#C9A84C)}
 .sd-input{width:100%;background:#18181F;border:1.5px solid #252530;border-radius:12px;padding:13px 14px;color:#F2EEE8;font-size:14px;transition:border-color .15s,box-shadow .15s}
-.sd-input:focus{border-color:#E8430A;box-shadow:0 0 0 3px #2D1200}
+.sd-input:focus{border-color:#00A19C;box-shadow:0 0 0 3px #2D1200}
 .sd-input::placeholder{color:#3D3D4E}
 .sd-input.error{border-color:#EF4444}
 .sd-btn{display:flex;align-items:center;justify-content:center;gap:8px;border:none;border-radius:12px;padding:13px 20px;font-size:15px;font-weight:700;cursor:pointer;width:100%}
-.sd-btn-primary{background:linear-gradient(135deg,#E8430A,#BF360C);color:#fff}
+.sd-btn-primary{background:linear-gradient(135deg,#00A19C,#C6C6C6);color:#fff}
 .sd-btn-primary:disabled{opacity:.5;cursor:not-allowed}
 .sd-btn-ghost{background:none;border:1.5px solid #252530;color:#AAA6A0}
 .no-scrollbar{scrollbar-width:none;-ms-overflow-style:none}
@@ -154,7 +154,7 @@ const MOCK_SPOTS = [
 
 const RARITY = {
   Hypercar: { bg:"#1a0a2e", text:"#b388ff", border:"#6a0dad" },
-  Exotic:   { bg:"#2D1200", text:"#E8430A", border:"#E8430A" },
+  Exotic:   { bg:"#2D1200", text:"#00A19C", border:"#00A19C" },
   Sports:   { bg:"#0a1a2e", text:"#60a5fa", border:"#60a5fa" },
 };
 
@@ -171,10 +171,10 @@ const Avatar = memo(({ initials, src, size=36, ring=false }) => {
   const fs = Math.round(size * 0.36);
   return (
     <div style={{ width:size, height:size, borderRadius:"50%", flexShrink:0, overflow:"hidden",
-      background:"linear-gradient(135deg,#E8430A,#7c1a02)",
+      background:"linear-gradient(135deg,#00A19C,#7c1a02)",
       display:"flex", alignItems:"center", justifyContent:"center",
       fontSize:fs, fontWeight:700, color:"#fff",
-      boxShadow: ring ? "0 0 0 2px #0A0A0C,0 0 0 4px #E8430A" : "none" }}>
+      boxShadow: ring ? "0 0 0 2px #0A0A0C,0 0 0 4px #00A19C" : "none" }}>
       {src && !err
         ? <img src={src} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}
             onError={() => setErr(true)} />
@@ -193,7 +193,7 @@ const RarityPill = memo(({ rarity }) => {
   );
 });
 
-const Spinner = ({ size=18, color="#E8430A" }) => (
+const Spinner = ({ size=18, color="#00A19C" }) => (
   <div className="spin" style={{ width:size, height:size, border:`2px solid ${color}30`,
     borderTopColor:color, borderRadius:"50%", flexShrink:0 }} />
 );
@@ -214,7 +214,7 @@ function AuthScreen() {
       <div style={{ width:"100%", maxWidth:400 }} className="fade-up">
         <div style={{ textAlign:"center", marginBottom:32 }}>
           <div className="glow" style={{ width:64, height:64, borderRadius:16, margin:"0 auto 14px",
-            background:"linear-gradient(135deg,#E8430A,#BF360C)",
+            background:"linear-gradient(135deg,#00A19C,#C6C6C6)",
             display:"flex", alignItems:"center", justifyContent:"center", fontSize:32 }}>🏎</div>
           <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:32, fontWeight:900,
             color:"#F2EEE8", letterSpacing:"-.02em" }}>SpotDrive</div>
@@ -307,7 +307,7 @@ function LoginForm({ onSwitch }) {
       <div style={{ height:1, background:"#252530", margin:"20px 0" }} />
       <div style={{ textAlign:"center", fontSize:13, color:"#6B6878" }}>
         New to SpotDrive?{" "}
-        <button onClick={() => onSwitch("signup")} style={{ color:"#E8430A", fontWeight:700, background:"none", border:"none" }}>Create account</button>
+        <button onClick={() => onSwitch("signup")} style={{ color:"#00A19C", fontWeight:700, background:"none", border:"none" }}>Create account</button>
       </div>
     </div>
   );
@@ -434,7 +434,7 @@ function SignupForm({ onSwitch }) {
       <div style={{ height:1, background:"#252530", margin:"20px 0" }} />
       <div style={{ textAlign:"center", fontSize:13, color:"#6B6878" }}>
         Already have an account?{" "}
-        <button onClick={() => onSwitch("login")} style={{ color:"#E8430A", fontWeight:700, background:"none", border:"none" }}>Sign in</button>
+        <button onClick={() => onSwitch("login")} style={{ color:"#00A19C", fontWeight:700, background:"none", border:"none" }}>Sign in</button>
       </div>
     </div>
   );
@@ -628,7 +628,7 @@ const handleReport = async (reason) => {
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:16, paddingTop:10, borderTop:"1px solid #252530" }}>
           <button onClick={handleLike} aria-pressed={liked}
-            style={{ display:"flex", alignItems:"center", gap:5, color:liked?"#E8430A":"#6B6878", fontSize:12, fontWeight:600, border:"none", background:"none" }}>
+            style={{ display:"flex", alignItems:"center", gap:5, color:liked?"#00A19C":"#6B6878", fontSize:12, fontWeight:600, border:"none", background:"none" }}>
             <span className={pop?"heart-pop":""}>{liked?"❤️":"🤍"}</span> {fmt(likes)}
           </button>
           <button style={{ display:"flex", alignItems:"center", gap:5, color:"#6B6878", fontSize:12, fontWeight:600, border:"none", background:"none" }}>
@@ -1055,7 +1055,7 @@ function NotificationSettingsSheet({ onClose }) {
     {
       title: "Activity",
       items: [
-        { key:"likes",     icon:"❤️", color:"#E8430A", label:"Likes",          desc:"When someone likes your spot" },
+        { key:"likes",     icon:"❤️", color:"#00A19C", label:"Likes",          desc:"When someone likes your spot" },
         { key:"comments",  icon:"💬", color:"#9B59B6", label:"Comments",       desc:"When someone comments on your spot" },
         { key:"follows",   icon:"👤", color:"#3B82F6", label:"New Followers",  desc:"When someone starts following you" },
         { key:"saves",     icon:"🔖", color:"#C9A84C", label:"Saves",          desc:"When someone saves your spot" },
@@ -1065,7 +1065,7 @@ function NotificationSettingsSheet({ onClose }) {
     {
       title: "Discovery",
       items: [
-        { key:"newSpotNearby", icon:"📍", color:"#E8430A", label:"Spots Near Me",   desc:"When a rare car is spotted in your area" },
+        { key:"newSpotNearby", icon:"📍", color:"#00A19C", label:"Spots Near Me",   desc:"When a rare car is spotted in your area" },
         { key:"weeklyDigest",  icon:"📰", color:"#3B82F6", label:"Weekly Digest",   desc:"A weekly summary of top spots" },
       ],
     },
@@ -1114,7 +1114,7 @@ function NotificationSettingsSheet({ onClose }) {
             </div>
             {/* Mute all toggle */}
             <div style={{ background: settings.muteAll ? "#2D1200" : "#18181F",
-              border:`1px solid ${settings.muteAll ? "#E8430A50" : "#252530"}`,
+              border:`1px solid ${settings.muteAll ? "#00A19C50" : "#252530"}`,
               borderRadius:12, padding:"14px 16px", marginBottom:8, transition:"all .2s" }}>
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
                 <span style={{ fontSize:22, flexShrink:0 }}>🔕</span>
@@ -1122,14 +1122,14 @@ function NotificationSettingsSheet({ onClose }) {
                   <div style={{ fontSize:14, fontWeight:600, color:"#F2EEE8", marginBottom:2 }}>
                     Mute All Notifications
                   </div>
-                  <div style={{ fontSize:11, color: settings.muteAll ? "#E8430A" : "#6B6878" }}>
+                  <div style={{ fontSize:11, color: settings.muteAll ? "#00A19C" : "#6B6878" }}>
                     {settings.muteAll ? muteLabel() : "Pause all notifications temporarily"}
                   </div>
                 </div>
                 <button onClick={() => toggle("muteAll")}
                   role="switch" aria-checked={settings.muteAll}
                   style={{ flexShrink:0, width:44, height:24, borderRadius:99,
-                    background: settings.muteAll ? "#E8430A" : "#252530",
+                    background: settings.muteAll ? "#00A19C" : "#252530",
                     border:"none", position:"relative", cursor:"pointer", transition:"background .2s" }}>
                   <div style={{ position:"absolute", top:2, left:settings.muteAll?22:2,
                     width:20, height:20, borderRadius:"50%", background:"#fff",
@@ -1219,7 +1219,7 @@ function NotificationSettingsSheet({ onClose }) {
           {/* Save */}
           <button onClick={save} disabled={saving}
             style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"center",
-              gap:8, padding:14, background:"linear-gradient(135deg,#E8430A,#BF360C)",
+              gap:8, padding:14, background:"linear-gradient(135deg,#00A19C,#C6C6C6)",
               border:"none", borderRadius:12, color:"#fff", fontSize:15, fontWeight:700, cursor:"pointer" }}>
             {saving ? <><Spinner size={16} color="#fff" /> Saving…</> : "Save Notification Settings"}
           </button>
@@ -1431,7 +1431,7 @@ const handleDeleteAccount = async () => {
               </div>
               <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
                 {section.items.map(({ key, icon, label, desc }) => (
-                  <div key={key} style={{ background:"#18181F", border:`1px solid ${settings[key] ? "#E8430A30" : "#252530"}`,
+                  <div key={key} style={{ background:"#18181F", border:`1px solid ${settings[key] ? "#00A19C30" : "#252530"}`,
                     borderRadius:12, padding:"14px 16px",
                     display:"flex", alignItems:"center", gap:12,
                     transition:"border-color .2s" }}>
@@ -1445,7 +1445,7 @@ const handleDeleteAccount = async () => {
                       role="switch" aria-checked={settings[key]}
                       aria-label={label}
                       style={{ flexShrink:0, width:44, height:24, borderRadius:99,
-                        background: settings[key] ? "#E8430A" : "#252530",
+                        background: settings[key] ? "#00A19C" : "#252530",
                         border:"none", position:"relative", cursor:"pointer",
                         transition:"background .2s" }}>
                       <div style={{ position:"absolute", top:2,
@@ -1518,7 +1518,7 @@ const handleDeleteAccount = async () => {
           {/* Save button */}
           <button onClick={saveSettings} disabled={saving}
             style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"center",
-              gap:8, padding:14, background:"linear-gradient(135deg,#E8430A,#BF360C)",
+              gap:8, padding:14, background:"linear-gradient(135deg,#00A19C,#C6C6C6)",
               border:"none", borderRadius:12, color:"#fff", fontSize:15, fontWeight:700,
               cursor:"pointer" }}>
             {saving ? <><Spinner size={16} color="#fff" /> Saving…</> : "Save Privacy Settings"}
@@ -1778,9 +1778,9 @@ const loadOffenders = useCallback(async () => {
             {[["reports","Reports"],["users","Users"]].map(([key,label]) => (
               <button key={key} onClick={() => setSection(key)}
                 style={{ flex:1, padding:"8px", borderRadius:8, fontSize:13, fontWeight:700,
-                  cursor:"pointer", border:`1px solid ${section===key?"#E8430A":"#252530"}`,
+                  cursor:"pointer", border:`1px solid ${section===key?"#00A19C":"#252530"}`,
                   background: section===key ? "#2D1200" : "none",
-                  color: section===key ? "#E8430A" : "#6B6878" }}>
+                  color: section===key ? "#00A19C" : "#6B6878" }}>
                 {label}
               </button>
             ))}
@@ -1791,7 +1791,7 @@ const loadOffenders = useCallback(async () => {
                 <button key={f} onClick={() => setFilter(f)}
                   style={{ padding:"6px 12px", borderRadius:8, fontSize:12, fontWeight:700,
                     cursor:"pointer", border:"1px solid #252530",
-                    background: filter===f ? "#E8430A" : "none",
+                    background: filter===f ? "#00A19C" : "none",
                     color: filter===f ? "#fff" : "#6B6878" }}>
                   {f === "pending" ? "Pending" : "All"}
                 </button>
@@ -2086,7 +2086,7 @@ function StoriesRow({ profile, onAddStory }) {
               }
             </div>
             <div style={{ position:"absolute", bottom:0, right:0, width:20, height:20,
-              borderRadius:"50%", background:"#E8430A", border:"2px solid #0A0A0C",
+              borderRadius:"50%", background:"#00A19C", border:"2px solid #0A0A0C",
               display:"flex", alignItems:"center", justifyContent:"center",
               fontSize:14, fontWeight:700, color:"#fff", lineHeight:1 }}>
               +
@@ -2107,7 +2107,7 @@ function StoriesRow({ profile, onAddStory }) {
             <div style={{ width:60, height:60, borderRadius:"50%", padding:2,
               background: s.viewed
                 ? "#252530"
-                : "linear-gradient(135deg,#E8430A,#C9A84C)",
+                : "linear-gradient(135deg,#00A19C,#C9A84C)",
               flexShrink:0 }}>
               <div style={{ width:"100%", height:"100%", borderRadius:"50%",
                 overflow:"hidden", border:"2px solid #0A0A0C" }}>
@@ -2206,7 +2206,7 @@ function StoryViewer({ stories, initialIndex, onClose, onViewed }) {
     return `${h}h left`;
   };
 
-  const RARITY_COLOR = { Hypercar:"#b388ff", Exotic:"#E8430A", Sports:"#60a5fa" };
+  const RARITY_COLOR = { Hypercar:"#b388ff", Exotic:"#00A19C", Sports:"#60a5fa" };
   if (!story) return null;
 
   // Clamp drag for visual feedback
@@ -2333,7 +2333,7 @@ function StoryViewer({ stories, initialIndex, onClose, onViewed }) {
                   alignItems:"center", gap:6, cursor:"pointer" }}>
                 {/* Thumbnail */}
                 <div style={{ width:56, height:80, borderRadius:10, overflow:"hidden",
-                  border:`2px solid ${i===idx?"#E8430A":"rgba(255,255,255,.15)"}`,
+                  border:`2px solid ${i===idx?"#00A19C":"rgba(255,255,255,.15)"}`,
                   position:"relative", flexShrink:0 }}>
                   {s.image
                     ? <img src={s.image} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
@@ -2349,11 +2349,11 @@ function StoryViewer({ stories, initialIndex, onClose, onViewed }) {
                   {i === idx && (
                     <div style={{ position:"absolute", bottom:4, left:"50%",
                       transform:"translateX(-50%)", width:16, height:3,
-                      borderRadius:2, background:"#E8430A" }} />
+                      borderRadius:2, background:"#00A19C" }} />
                   )}
                 </div>
                 {/* Make */}
-                <div style={{ fontSize:9, color: i===idx?"#E8430A":"rgba(255,255,255,.5)",
+                <div style={{ fontSize:9, color: i===idx?"#00A19C":"rgba(255,255,255,.5)",
                   fontWeight:700, maxWidth:56, overflow:"hidden",
                   textOverflow:"ellipsis", whiteSpace:"nowrap", textAlign:"center" }}>
                   {s.make}
@@ -2389,7 +2389,7 @@ function StoryViewer({ stories, initialIndex, onClose, onViewed }) {
           <button style={{ background:"none", border:"none", fontSize:22, cursor:"pointer" }}>❤️</button>
           {reply.trim() && (
             <button onClick={() => setReply("")}
-              style={{ background:"#E8430A", border:"none", borderRadius:99,
+              style={{ background:"#00A19C", border:"none", borderRadius:99,
                 padding:"7px 14px", color:"#fff", fontSize:12, fontWeight:700, cursor:"pointer" }}>
               Send
             </button>
@@ -2537,7 +2537,7 @@ function StoryUploadModal({ onClose }) {
 
               <button onClick={post} disabled={posting || !file}
                 style={{ width:"100%", padding:13, borderRadius:12,
-                  background:"linear-gradient(135deg,#E8430A,#BF360C)",
+                  background:"linear-gradient(135deg,#00A19C,#C6C6C6)",
                   border:"none", color:"#fff", fontSize:15, fontWeight:700,
                   cursor: posting||!file ? "not-allowed" : "pointer",
                   opacity: posting||!file ? 0.6 : 1,
@@ -2731,7 +2731,7 @@ const bottomRef   = useRef(null);
       {showPushBanner && <PushNotificationBanner onDismiss={() => setShowPushBanner(false)} />}
 
       <div style={{ margin:"10px 14px", padding:"10px 14px", background:"#2D1200",
-        border:"1px solid rgba(232,67,10,.3)", borderRadius:12,
+        border:"1px solid rgba(0,161,156,.3)", borderRadius:12,
         display:"flex", alignItems:"center", gap:8, fontSize:13 }}>
         <span>🔥</span>
         <span style={{ color:"#F2EEE8", fontWeight:600 }}>Trending: </span>
@@ -2927,7 +2927,7 @@ function FollowRequestsSheet({ userId, onClose, onViewProfile }) {
                 </button>
                 <button onClick={() => accept(r.id)} disabled={processingId===r.id}
                   style={{ padding:"6px 12px", borderRadius:99, fontSize:11, fontWeight:700,
-                    background:"#E8430A", border:"1px solid #E8430A", color:"#fff", cursor:"pointer",
+                    background:"#00A19C", border:"1px solid #00A19C", color:"#fff", cursor:"pointer",
                     display:"flex", alignItems:"center", gap:4 }}>
                   {processingId===r.id ? <Spinner size={10} color="#fff" /> : "Accept"}
                 </button>
@@ -3008,8 +3008,8 @@ function FollowButton({ targetUserId, targetHandle, size="md" }) {
       aria-label={following ? `Unfollow @${targetHandle}` : pending ? `Cancel request to @${targetHandle}` : `Follow @${targetHandle}`}
       style={{ padding: sm?"5px 14px":"8px 20px",
         borderRadius:99, fontSize: sm?11:13, fontWeight:700,
-        background: isNeutral ? "none" : "#E8430A",
-        border: isNeutral ? "1px solid #252530" : "1px solid #E8430A",
+        background: isNeutral ? "none" : "#00A19C",
+        border: isNeutral ? "1px solid #252530" : "1px solid #00A19C",
         color: isNeutral ? "#6B6878" : "#fff",
         cursor: processing ? "not-allowed" : "pointer",
         opacity: processing ? 0.7 : 1,
@@ -3215,8 +3215,8 @@ function SpotterProfileSheet({ handle, onClose }) {
                     <button key={t} onClick={() => setTab(t)}
                       style={{ flex:1, padding:"10px", fontSize:12, fontWeight:600,
                         background:"none", border:"none", cursor:"pointer", textTransform:"capitalize",
-                        color: tab===t ? "#E8430A" : "#6B6878",
-                        borderBottom: tab===t ? "2px solid #E8430A" : "2px solid transparent" }}>
+                        color: tab===t ? "#00A19C" : "#6B6878",
+                        borderBottom: tab===t ? "2px solid #00A19C" : "2px solid transparent" }}>
                       {t}
                     </button>
                   ))}
@@ -3351,8 +3351,8 @@ function ExploreScreen({ onSpotTap }) {
           <button key={key} onClick={()=>{ setTab(key); setQuery(""); }}
             style={{ flex:1, padding:"9px", borderRadius:10, fontSize:13, fontWeight:700,
               background: tab===key ? "#2D1200" : "#18181F",
-              border:`1px solid ${tab===key?"#E8430A":"#252530"}`,
-              color: tab===key?"#E8430A":"#6B6878", cursor:"pointer" }}>
+              border:`1px solid ${tab===key?"#00A19C":"#252530"}`,
+              color: tab===key?"#00A19C":"#6B6878", cursor:"pointer" }}>
             {label}
           </button>
         ))}
@@ -3365,8 +3365,8 @@ function ExploreScreen({ onSpotTap }) {
             {["All","Hypercar","Exotic","Sports"].map(f => (
               <button key={f} onClick={()=>setFilter(f)}
                 style={{ padding:"6px 14px", borderRadius:20, fontSize:12, fontWeight:600,
-                  background:filter===f?"#2D1200":"#18181F", border:`1px solid ${filter===f?"#E8430A":"#252530"}`,
-                  color:filter===f?"#E8430A":"#6B6878", whiteSpace:"nowrap", cursor:"pointer" }}>{f}</button>
+                  background:filter===f?"#2D1200":"#18181F", border:`1px solid ${filter===f?"#00A19C":"#252530"}`,
+                  color:filter===f?"#00A19C":"#6B6878", whiteSpace:"nowrap", cursor:"pointer" }}>{f}</button>
             ))}
           </div>
           {loadingSpots
@@ -3533,7 +3533,7 @@ function ProfileScreen() {
           <div style={{ position:"relative", cursor:"pointer" }} onClick={() => avatarRef.current?.click()}>
             <Avatar initials={profile?.handle?.slice(0,2).toUpperCase()||"?"} src={profile?.avatar_url} size={72} ring />
             <div style={{ position:"absolute", bottom:0, right:0, width:22, height:22, borderRadius:"50%",
-              background:"#E8430A", border:"2px solid #0A0A0C",
+              background:"#00A19C", border:"2px solid #0A0A0C",
               display:"flex", alignItems:"center", justifyContent:"center", fontSize:11 }}>
               {uploadingPhoto ? <Spinner size={10} color="#fff" /> : "📷"}
             </div>
@@ -3545,8 +3545,8 @@ function ProfileScreen() {
             <div style={{ fontSize:13, color:"#6B6878" }}>@{profile?.handle}</div>
             {profile?.bio && <div style={{ fontSize:12, color:"#AAA6A0", marginTop:4, maxWidth:260, lineHeight:1.4 }}>{profile.bio}</div>}
             <div style={{ marginTop:6, display:"inline-flex", alignItems:"center", gap:5,
-              background:"#2D1200", border:"1px solid #E8430A", borderRadius:6,
-              padding:"3px 10px", fontSize:11, color:"#E8430A", fontWeight:700 }}>
+              background:"#2D1200", border:"1px solid #00A19C", borderRadius:6,
+              padding:"3px 10px", fontSize:11, color:"#00A19C", fontWeight:700 }}>
               🏎 Spotter
             </div>
           </div>
@@ -3559,7 +3559,7 @@ function ProfileScreen() {
               <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:22, fontWeight:900, color:"#F2EEE8" }}>{value}</div>
               <div style={{ fontSize:10, color:"#6B6878", textTransform:"uppercase", letterSpacing:".05em" }}>{label}</div>
               {listType==="requests" && value>0 && (
-                <div style={{ position:"absolute", top:-4, right:"30%", width:8, height:8, borderRadius:"50%", background:"#E8430A" }} />
+                <div style={{ position:"absolute", top:-4, right:"30%", width:8, height:8, borderRadius:"50%", background:"#00A19C" }} />
               )}
             </div>
           ))}
@@ -3721,7 +3721,7 @@ function MessagesScreen({ directOpen, onDirectOpenHandled }) {
               </div>
             </div>
             {c.unread > 0 && (
-              <div style={{ background:"#E8430A", borderRadius:99, minWidth:20, height:20,
+              <div style={{ background:"#00A19C", borderRadius:99, minWidth:20, height:20,
                 display:"flex", alignItems:"center", justifyContent:"center",
                 fontSize:11, fontWeight:700, color:"#fff", padding:"0 6px", flexShrink:0 }}>
                 {c.unread > 9 ? "9+" : c.unread}
@@ -3854,7 +3854,7 @@ function ConversationView({ conversation, currentUserId, onClose }) {
               <div key={m.id} style={{ display:"flex", justifyContent: isMine ? "flex-end" : "flex-start" }}>
                 <div style={{ maxWidth:"75%" }}>
                   <div style={{
-                    background: isMine ? "#E8430A" : "#18181F",
+                    background: isMine ? "#00A19C" : "#18181F",
                     border: isMine ? "none" : "1px solid #252530",
                     borderRadius: isMine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
                     padding: m.photo_url ? 4 : "9px 13px",
@@ -3898,9 +3898,9 @@ function ConversationView({ conversation, currentUserId, onClose }) {
           </div>
           {text.trim() && (
             <button onClick={sendMessage} disabled={sending}
-              style={{ background:"none", border:"none", color:"#E8430A",
+              style={{ background:"none", border:"none", color:"#00A19C",
                 fontWeight:700, fontSize:13, cursor:"pointer", flexShrink:0 }}>
-              {sending ? <Spinner size={14} color="#E8430A" /> : "Send"}
+              {sending ? <Spinner size={14} color="#00A19C" /> : "Send"}
             </button>
           )}
         </div>
@@ -3966,7 +3966,7 @@ function NotificationsScreen() {  const { user, profile } = useAuth();
   };
 
   const TYPE_CONFIG = {
-    like:    { icon:"❤️", color:"#E8430A", label:"Likes"    },
+    like:    { icon:"❤️", color:"#00A19C", label:"Likes"    },
     follow:  { icon:"👤", color:"#3B82F6", label:"Follows"  },
     comment: { icon:"💬", color:"#9B59B6", label:"Comments" },
     save:    { icon:"🔖", color:"#C9A84C", label:"Saves"    },
@@ -3993,7 +3993,7 @@ function NotificationsScreen() {  const { user, profile } = useAuth();
             Notifications
           </div>
           {unreadCount > 0 && (
-            <div style={{ background:"#E8430A", borderRadius:99, padding:"2px 8px",
+            <div style={{ background:"#00A19C", borderRadius:99, padding:"2px 8px",
               fontSize:11, fontWeight:700, color:"#fff" }}>
               {unreadCount}
             </div>
@@ -4001,7 +4001,7 @@ function NotificationsScreen() {  const { user, profile } = useAuth();
         </div>
         {unreadCount > 0 && (
           <button onClick={markAllRead}
-            style={{ fontSize:12, color:"#E8430A", fontWeight:700, background:"none", border:"none", cursor:"pointer" }}>
+            style={{ fontSize:12, color:"#00A19C", fontWeight:700, background:"none", border:"none", cursor:"pointer" }}>
             Mark all read
           </button>
         )}
@@ -4019,8 +4019,8 @@ function NotificationsScreen() {  const { user, profile } = useAuth();
           <button key={f.key} onClick={() => setFilter(f.key)}
             style={{ padding:"10px 14px", fontSize:12, fontWeight:600, whiteSpace:"nowrap",
               background:"none", border:"none", cursor:"pointer",
-              color: filter===f.key ? "#E8430A" : "#6B6878",
-              borderBottom: filter===f.key ? "2px solid #E8430A" : "2px solid transparent" }}>
+              color: filter===f.key ? "#00A19C" : "#6B6878",
+              borderBottom: filter===f.key ? "2px solid #00A19C" : "2px solid transparent" }}>
             {f.label}
           </button>
         ))}
@@ -4061,7 +4061,7 @@ function NotificationsScreen() {  const { user, profile } = useAuth();
                 {/* Unread dot */}
                 {!n.read && (
                   <div style={{ position:"absolute", left:-8, top:"50%", transform:"translateY(-50%)",
-                    width:6, height:6, borderRadius:"50%", background:"#E8430A" }} />
+                    width:6, height:6, borderRadius:"50%", background:"#00A19C" }} />
                 )}
                 {/* Avatar with type badge */}
                 <div style={{ position:"relative", flexShrink:0 }}>
@@ -4219,7 +4219,7 @@ function SearchScreen() {
             style={{ width:"100%", background:"#18181F", border:"1.5px solid #252530",
               borderRadius:14, padding:"11px 40px 11px 40px", color:"#F2EEE8",
               fontSize:14, outline:"none", transition:"border-color .15s",
-              ...(query ? { borderColor:"#E8430A", boxShadow:"0 0 0 3px #2D1200" } : {}) }} />
+              ...(query ? { borderColor:"#00A19C", boxShadow:"0 0 0 3px #2D1200" } : {}) }} />
           {query && (
             <button onClick={clearSearch}
               style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)",
@@ -4278,7 +4278,7 @@ function SearchScreen() {
                 padding:"14px 16px 8px" }}>
                 <div style={{ fontSize:13, fontWeight:700, color:"#F2EEE8" }}>Recent</div>
                 <button onClick={() => setRecentSearches([])}
-                  style={{ fontSize:12, color:"#E8430A", fontWeight:600,
+                  style={{ fontSize:12, color:"#00A19C", fontWeight:600,
                     background:"none", border:"none", cursor:"pointer" }}>
                   Clear all
                 </button>
@@ -4411,11 +4411,11 @@ function MainApp() {
         backdropFilter:"blur(14px)", borderBottom:"1px solid #252530",
         padding:"12px 16px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
         <div style={{ display:"flex", alignItems:"center", gap:9 }}>
-          <div style={{ width:32, height:32, borderRadius:9, background:"linear-gradient(135deg,#E8430A,#BF360C)",
+          <div style={{ width:32, height:32, borderRadius:9, background:"linear-gradient(135deg,#00A19C,#C6C6C6)",
             display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>🏎</div>
           <div>
             <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:19, fontWeight:900, color:"#F2EEE8", lineHeight:1, letterSpacing:"-.02em" }}>SpotDrive</div>
-            <div style={{ fontSize:9, color:"#E8430A", fontWeight:700, letterSpacing:".1em" }}>BETA</div>
+            <div style={{ fontSize:9, color:"#00A19C", fontWeight:700, letterSpacing:".1em" }}>BETA</div>
           </div>
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:12 }}>
@@ -4427,7 +4427,7 @@ function MainApp() {
             <span style={{ fontSize:20 }}>🔔</span>
             {unreadCount > 0 && (
               <div style={{ position:"absolute", top:0, right:0, width:16, height:16,
-                borderRadius:"50%", background:"#E8430A", border:"2px solid #0A0A0C",
+                borderRadius:"50%", background:"#00A19C", border:"2px solid #0A0A0C",
                 display:"flex", alignItems:"center", justifyContent:"center",
                 fontSize:8, fontWeight:800, color:"#fff" }}>
                 {unreadCount > 9 ? "9+" : unreadCount}
@@ -4441,7 +4441,7 @@ function MainApp() {
             <span style={{ fontSize:20 }}>✉️</span>
             {unreadMessages > 0 && (
               <div style={{ position:"absolute", top:0, right:0, width:16, height:16,
-                borderRadius:"50%", background:"#E8430A", border:"2px solid #0A0A0C",
+                borderRadius:"50%", background:"#00A19C", border:"2px solid #0A0A0C",
                 display:"flex", alignItems:"center", justifyContent:"center",
                 fontSize:8, fontWeight:800, color:"#fff" }}>
                 {unreadMessages > 9 ? "9+" : unreadMessages}
@@ -4471,9 +4471,9 @@ function MainApp() {
           if (key==="upload") return (
             <button key="upload" onClick={() => setShowUpload(true)}
               style={{ width:50, height:50, borderRadius:"50%", border:"none",
-                background:"linear-gradient(135deg,#E8430A,#BF360C)",
+                background:"linear-gradient(135deg,#00A19C,#C6C6C6)",
                 display:"flex", alignItems:"center", justifyContent:"center",
-                fontSize:22, boxShadow:"0 4px 16px rgba(232,67,10,.5)", transform:"translateY(-6px)", cursor:"pointer" }}>
+                fontSize:22, boxShadow:"0 4px 16px rgba(0,161,156,.5)", transform:"translateY(-6px)", cursor:"pointer" }}>
               ＋
             </button>
           );
@@ -4481,7 +4481,7 @@ function MainApp() {
             <button key={key} onClick={() => setScreen(key)} className={`nav-item${screen===key?" active":""}`}>
               <span style={{ fontSize:22 }}>{icon}</span>
               <span>{label}</span>
-              {screen===key && <div style={{ width:4, height:4, borderRadius:"50%", background:"#E8430A", marginTop:2 }} />}
+              {screen===key && <div style={{ width:4, height:4, borderRadius:"50%", background:"#00A19C", marginTop:2 }} />}
             </button>
           );
         })}
@@ -4556,7 +4556,7 @@ function renderWithMentions(text) {
   const parts = text.split(/(@[a-zA-Z0-9_]+)/g);
   return parts.map((part, i) =>
     /^@[a-zA-Z0-9_]+$/.test(part)
-      ? <span key={i} style={{ color:"#E8430A", fontWeight:700 }}>{part}</span>
+      ? <span key={i} style={{ color:"#00A19C", fontWeight:700 }}>{part}</span>
       : part
   );
 }
@@ -4698,7 +4698,7 @@ function CommentRow({ comment: c, user, profile, timeAgo, onReply, onDelete, rep
         <div style={{ display:"flex", alignItems:"center", gap:14, marginTop:6 }}>
           <button onClick={handleLike}
             style={{ display:"flex", alignItems:"center", gap:4, background:"none",
-              border:"none", cursor:"pointer", color: liked ? "#E8430A" : "#6B6878",
+              border:"none", cursor:"pointer", color: liked ? "#00A19C" : "#6B6878",
               fontSize:12, fontWeight:600, transition:"color .15s" }}>
             {liked ? "❤️" : "🤍"}{likes > 0 ? ` ${likes}` : ""}
           </button>
@@ -4853,7 +4853,7 @@ function MediaGallery({ spotId, fallbackImage }) {
             {media.map((_, i) => (
               <button key={i} onClick={() => goTo(i)} aria-label={`Go to media ${i+1}`}
                 style={{ width:i===idx?14:5, height:5, borderRadius:3, border:"none", padding:0,
-                  background:i===idx?"#E8430A":"rgba(255,255,255,.4)", transition:"width .15s ease",
+                  background:i===idx?"#00A19C":"rgba(255,255,255,.4)", transition:"width .15s ease",
                   cursor:"pointer" }} />
             ))}
           </div>
@@ -5051,12 +5051,12 @@ function CommentsSheet({ spot, onClose }) {
             <div style={{ display:"flex", gap:16, marginTop:12, paddingTop:12,
               borderTop:"1px solid #252530" }}>
               <button onClick={handleLike}
-                style={{ display:"flex", alignItems:"center", gap:5, color:liked?"#E8430A":"#6B6878",
+                style={{ display:"flex", alignItems:"center", gap:5, color:liked?"#00A19C":"#6B6878",
                   fontSize:13, fontWeight:600, border:"none", background:"none", cursor:"pointer" }}>
                 {liked?"❤️":"🤍"} {fmt(likes)}
               </button>
               <button onClick={() => inputRef.current?.focus()}
-                style={{ display:"flex", alignItems:"center", gap:5, color:"#E8430A",
+                style={{ display:"flex", alignItems:"center", gap:5, color:"#00A19C",
                   fontSize:13, fontWeight:600, border:"none", background:"none", cursor:"pointer" }}>
                 💬 {comments.length}
               </button>
@@ -5134,7 +5134,7 @@ function CommentsSheet({ spot, onClose }) {
           )}
           {replyingToHandle && (
             <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8, fontSize:12, color:"#6B6878" }}>
-              Replying to <span style={{ color:"#E8430A", fontWeight:700 }}>@{replyingToHandle}</span>
+              Replying to <span style={{ color:"#00A19C", fontWeight:700 }}>@{replyingToHandle}</span>
               <button onClick={() => { setReplyingTo(null); setReplyingToHandle(null); setText(""); }}
                 style={{ background:"none", border:"none", color:"#6B6878", cursor:"pointer", fontSize:12, marginLeft:4 }}>
                 ✕ Cancel
@@ -5147,7 +5147,7 @@ function CommentsSheet({ spot, onClose }) {
             <div style={{ flex:1, background:"#14141A", border:"1.5px solid #252530",
               borderRadius:22, padding:"8px 14px", display:"flex", alignItems:"center", gap:8,
               transition:"border-color .15s", position:"relative",
-              ...(text ? { borderColor:"#E8430A", boxShadow:"0 0 0 3px #2D1200" } : {}) }}>
+              ...(text ? { borderColor:"#00A19C", boxShadow:"0 0 0 3px #2D1200" } : {}) }}>
               <input
                 ref={inputRef}
                 value={text}
@@ -5160,10 +5160,10 @@ function CommentsSheet({ spot, onClose }) {
                 onInsert={t => { setText(t); inputRef.current?.focus(); }} />
               {text.trim() && (
                 <button onClick={postComment} disabled={posting}
-                  style={{ background:"none", border:"none", color:"#E8430A",
+                  style={{ background:"none", border:"none", color:"#00A19C",
                     fontWeight:700, fontSize:13, cursor:"pointer", flexShrink:0,
                     display:"flex", alignItems:"center", gap:4 }}>
-                  {posting ? <Spinner size={14} color="#E8430A" /> : "Post"}
+                  {posting ? <Spinner size={14} color="#00A19C" /> : "Post"}
                 </button>
               )}
             </div>
@@ -5243,7 +5243,7 @@ function LeaderboardScreen() {
     { key:"sports",   label:"🏁 Sports"   },
   ];
 
-  const RC = { Hypercar:"#b388ff", Exotic:"#E8430A", Sports:"#60a5fa" };
+  const RC = { Hypercar:"#b388ff", Exotic:"#00A19C", Sports:"#60a5fa" };
 
   return (
     <div>
@@ -5265,8 +5265,8 @@ function LeaderboardScreen() {
           <button key={t.key} onClick={() => setTab(t.key)}
             style={{ padding:"10px 14px", fontSize:12, fontWeight:700,
               whiteSpace:"nowrap", background:"none", border:"none", cursor:"pointer",
-              color: tab===t.key ? "#E8430A" : "#6B6878",
-              borderBottom: tab===t.key ? "2px solid #E8430A" : "2px solid transparent" }}>
+              color: tab===t.key ? "#00A19C" : "#6B6878",
+              borderBottom: tab===t.key ? "2px solid #00A19C" : "2px solid transparent" }}>
             {t.label}
           </button>
         ))}
@@ -5353,7 +5353,7 @@ function LeaderboardScreen() {
               </div>
               <div style={{ fontSize:11, color:"#6B6878" }}>
                 @{s.handle}
-                {s.streak > 0 && <span style={{ color:"#E8430A", marginLeft:8 }}>🔥 {s.streak} day streak</span>}
+                {s.streak > 0 && <span style={{ color:"#00A19C", marginLeft:8 }}>🔥 {s.streak} day streak</span>}
                 {s.city && <span style={{ marginLeft:8 }}>📍 {s.city}</span>}
               </div>
             </div>
@@ -5575,7 +5575,7 @@ function EditSpotModal({ spot, onClose, onDeleted }) {
 
           <button onClick={save} disabled={saving}
             style={{ width:"100%", padding:13, borderRadius:12,
-              background:"linear-gradient(135deg,#E8430A,#BF360C)",
+              background:"linear-gradient(135deg,#00A19C,#C6C6C6)",
               border:"none", color:"#fff", fontSize:15, fontWeight:700,
               cursor:saving?"not-allowed":"pointer", display:"flex",
               alignItems:"center", justifyContent:"center", gap:8 }}>
@@ -5631,7 +5631,7 @@ function OnboardingFlow({ onDone }) {
       title:"Welcome to SpotDrive",
       sub:"The world's first social network built for car spotters.",
       detail:"Capture rare cars in the wild. Share your sightings. Build your reputation.",
-      color:"#E8430A",
+      color:"#00A19C",
       bg:"linear-gradient(135deg,#2D1200,#0A0A0C)",
     },
     {
@@ -5769,7 +5769,7 @@ function PushNotificationBanner({ onDismiss }) {
   return (
     <div style={{ margin:"10px 14px 0", padding:"12px 14px",
       background:"linear-gradient(135deg,#2D1200,#14141A)",
-      border:"1px solid #E8430A30", borderRadius:12,
+      border:"1px solid #00A19C30", borderRadius:12,
       display:"flex", alignItems:"center", gap:12 }}>
       <span style={{ fontSize:22, flexShrink:0 }}>🔔</span>
       <div style={{ flex:1 }}>
@@ -5791,7 +5791,7 @@ function PushNotificationBanner({ onDismiss }) {
           </button>
           <button onClick={handle} disabled={requesting}
             style={{ padding:"5px 12px", borderRadius:8,
-              background:"#E8430A", border:"none",
+              background:"#00A19C", border:"none",
               color:"#fff", fontSize:11, fontWeight:700, cursor:"pointer" }}>
             {requesting ? "…" : "Enable"}
           </button>
@@ -5883,7 +5883,7 @@ class ErrorBoundary extends React.Component {
         </div>
         <button onClick={() => window.location.reload()}
           style={{ padding:"12px 24px", borderRadius:12,
-            background:"linear-gradient(135deg,#E8430A,#BF360C)",
+            background:"linear-gradient(135deg,#00A19C,#C6C6C6)",
             border:"none", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>
           Reload App
         </button>
@@ -5911,7 +5911,7 @@ function AppContent() {
     <div style={{ minHeight:"100vh", background:"#0A0A0C", display:"flex",
       alignItems:"center", justifyContent:"center", flexDirection:"column", gap:16 }}>
       <div style={{ width:56, height:56, borderRadius:14,
-        background:"linear-gradient(135deg,#E8430A,#BF360C)",
+        background:"linear-gradient(135deg,#00A19C,#C6C6C6)",
         display:"flex", alignItems:"center", justifyContent:"center", fontSize:28 }}>🏎</div>
       <Spinner size={24} />
       <div style={{ fontSize:13, color:"#6B6878" }}>Confirming your email…</div>
@@ -5929,7 +5929,7 @@ function AppContent() {
       <div style={{ fontSize:13, color:"#6B6878", maxWidth:280 }}>{confError}</div>
       <button onClick={() => window.location.href = "/"}
         style={{ padding:"12px 24px", borderRadius:12,
-          background:"linear-gradient(135deg,#E8430A,#BF360C)",
+          background:"linear-gradient(135deg,#00A19C,#C6C6C6)",
           border:"none", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>
         Back to Sign In
       </button>
@@ -5949,7 +5949,7 @@ function AppContent() {
       <div style={{ fontSize:13, color:"#6B6878" }}>Check your connection and try again.</div>
       <button onClick={() => window.location.reload()}
         style={{ padding:"12px 24px", borderRadius:12,
-          background:"linear-gradient(135deg,#E8430A,#BF360C)",
+          background:"linear-gradient(135deg,#00A19C,#C6C6C6)",
           border:"none", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>
         Retry
       </button>
@@ -5960,7 +5960,7 @@ function AppContent() {
     <div style={{ minHeight:"100vh", background:"#0A0A0C", display:"flex",
       alignItems:"center", justifyContent:"center", flexDirection:"column", gap:16 }}>
       <div style={{ width:56, height:56, borderRadius:14,
-        background:"linear-gradient(135deg,#E8430A,#BF360C)",
+        background:"linear-gradient(135deg,#00A19C,#C6C6C6)",
         display:"flex", alignItems:"center", justifyContent:"center", fontSize:28 }}>🏎</div>
       <Spinner size={24} />
       <div style={{ fontSize:12, color:"#6B6878" }}>Loading SpotDrive…</div>
