@@ -12,7 +12,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
 
 const T = {
   bg:"#0A0A0C", surface:"#14141A", surfaceHi:"#1C1C24", card:"#18181F",
-  border:"#252530", accent:"#00A19C", accentDk:"#C6C6C6", accentDm:"#2D1200",
+  border:"#252530", accent:"#00A19C", accentDk:"#C6C6C6", accentDm:"#0A2626",
   gold:"#C9A84C", green:"#22C55E", blue:"#3B82F6", danger:"#EF4444",
   text:"#F2EEE8", sub:"#AAA6A0", muted:"#6B6878", faint:"#3D3D4E",
 };
@@ -42,7 +42,7 @@ button{cursor:pointer;font-family:inherit}input,textarea{font-family:inherit;out
 .nav-item.active{color:#00A19C}
 .story-ring{border-radius:50%;padding:2px;background:linear-gradient(135deg,#00A19C,#C9A84C)}
 .sd-input{width:100%;background:#18181F;border:1.5px solid #252530;border-radius:12px;padding:13px 14px;color:#F2EEE8;font-size:14px;transition:border-color .15s,box-shadow .15s}
-.sd-input:focus{border-color:#00A19C;box-shadow:0 0 0 3px #2D1200}
+.sd-input:focus{border-color:#00A19C;box-shadow:0 0 0 3px #0A2626}
 .sd-input::placeholder{color:#3D3D4E}
 .sd-input.error{border-color:#EF4444}
 .sd-btn{display:flex;align-items:center;justify-content:center;gap:8px;border:none;border-radius:12px;padding:13px 20px;font-size:15px;font-weight:700;cursor:pointer;width:100%}
@@ -154,7 +154,7 @@ const MOCK_SPOTS = [
 
 const RARITY = {
   Hypercar: { bg:"#1a0a2e", text:"#b388ff", border:"#6a0dad" },
-  Exotic:   { bg:"#2D1200", text:"#00A19C", border:"#00A19C" },
+  Exotic:   { bg:"#0A2626", text:"#00A19C", border:"#00A19C" },
   Sports:   { bg:"#0a1a2e", text:"#60a5fa", border:"#60a5fa" },
 };
 
@@ -599,7 +599,7 @@ const handleReport = async (reason) => {
           ? <img src={spot.image} alt={`${spot.make} ${spot.model}`} loading="lazy"
               onError={() => setImgErr(true)}
               style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover" }} />
-          : <div style={{ position:"absolute", inset:0, background:"linear-gradient(135deg,#2D1200,#1C1C24)",
+          : <div style={{ position:"absolute", inset:0, background:"linear-gradient(135deg,#0A2626,#1C1C24)",
               display:"flex", alignItems:"center", justifyContent:"center", fontSize:48 }}>🏎</div>
         }
         <div style={{ position:"absolute", inset:0, background:"linear-gradient(to bottom, transparent 50%, rgba(0,0,0,.6))" }} />
@@ -1113,7 +1113,7 @@ function NotificationSettingsSheet({ onClose }) {
               Mute
             </div>
             {/* Mute all toggle */}
-            <div style={{ background: settings.muteAll ? "#2D1200" : "#18181F",
+            <div style={{ background: settings.muteAll ? "#0A2626" : "#18181F",
               border:`1px solid ${settings.muteAll ? "#00A19C50" : "#252530"}`,
               borderRadius:12, padding:"14px 16px", marginBottom:8, transition:"all .2s" }}>
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
@@ -1779,7 +1779,7 @@ const loadOffenders = useCallback(async () => {
               <button key={key} onClick={() => setSection(key)}
                 style={{ flex:1, padding:"8px", borderRadius:8, fontSize:13, fontWeight:700,
                   cursor:"pointer", border:`1px solid ${section===key?"#00A19C":"#252530"}`,
-                  background: section===key ? "#2D1200" : "none",
+                  background: section===key ? "#0A2626" : "none",
                   color: section===key ? "#00A19C" : "#6B6878" }}>
                 {label}
               </button>
@@ -2114,7 +2114,7 @@ function StoriesRow({ profile, onAddStory }) {
                 {s.image
                   ? <img src={s.image} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
                   : <div style={{ width:"100%", height:"100%",
-                      background:"linear-gradient(135deg,#2D1200,#1C1C24)",
+                      background:"linear-gradient(135deg,#0A2626,#1C1C24)",
                       display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>🏎</div>
                 }
               </div>
@@ -2245,7 +2245,7 @@ function StoryViewer({ stories, initialIndex, onClose, onViewed }) {
           ? <img src={story.image} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}
               onError={() => setImgErr(true)} />
           : <div style={{ width:"100%", height:"100%",
-              background:"linear-gradient(135deg,#2D1200,#0A0A0C)",
+              background:"linear-gradient(135deg,#0A2626,#0A0A0C)",
               display:"flex", alignItems:"center", justifyContent:"center", fontSize:80 }}>🏎</div>
         }
 
@@ -2337,7 +2337,7 @@ function StoryViewer({ stories, initialIndex, onClose, onViewed }) {
                   position:"relative", flexShrink:0 }}>
                   {s.image
                     ? <img src={s.image} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
-                    : <div style={{ width:"100%", height:"100%", background:"#2D1200",
+                    : <div style={{ width:"100%", height:"100%", background:"#0A2626",
                         display:"flex", alignItems:"center", justifyContent:"center", fontSize:22 }}>🏎</div>
                   }
                   {/* Viewed overlay */}
@@ -2730,7 +2730,7 @@ const bottomRef   = useRef(null);
 
       {showPushBanner && <PushNotificationBanner onDismiss={() => setShowPushBanner(false)} />}
 
-      <div style={{ margin:"10px 14px", padding:"10px 14px", background:"#2D1200",
+      <div style={{ margin:"10px 14px", padding:"10px 14px", background:"#0A2626",
         border:"1px solid rgba(0,161,156,.3)", borderRadius:12,
         display:"flex", alignItems:"center", gap:8, fontSize:13 }}>
         <span>🔥</span>
@@ -3165,7 +3165,7 @@ function SpotterProfileSheet({ handle, onClose }) {
           ) : (
             <div>
               {/* Profile header */}
-              <div style={{ background:"linear-gradient(180deg,#2D1200 0%,#0A0A0C 100%)", padding:"0 16px 0" }}>
+              <div style={{ background:"linear-gradient(180deg,#0A2626 0%,#0A0A0C 100%)", padding:"0 16px 0" }}>
                 <div style={{ display:"flex", gap:14, alignItems:"flex-end", marginBottom:16 }}>
                   <Avatar initials={spotter.handle?.slice(0,2).toUpperCase()||"?"} src={spotter.avatar_url} size={64} ring />
                   <div style={{ flex:1 }}>
@@ -3237,7 +3237,7 @@ function SpotterProfileSheet({ handle, onClose }) {
                         {s.image_url
                           ? <img src={s.image_url} alt="" loading="lazy"
                               style={{ width:"100%", height:"100%", objectFit:"cover" }} />
-                          : <div style={{ width:"100%", height:"100%", background:"#2D1200",
+                          : <div style={{ width:"100%", height:"100%", background:"#0A2626",
                               display:"flex", alignItems:"center", justifyContent:"center", fontSize:24 }}>🏎</div>
                         }
                         <div style={{ position:"absolute", inset:0, background:"linear-gradient(to bottom,transparent 60%,rgba(0,0,0,.7))" }} />
@@ -3350,7 +3350,7 @@ function ExploreScreen({ onSpotTap }) {
         {[["spots","🏎 Spots"],["spotters","👥 Spotters"]].map(([key,label]) => (
           <button key={key} onClick={()=>{ setTab(key); setQuery(""); }}
             style={{ flex:1, padding:"9px", borderRadius:10, fontSize:13, fontWeight:700,
-              background: tab===key ? "#2D1200" : "#18181F",
+              background: tab===key ? "#0A2626" : "#18181F",
               border:`1px solid ${tab===key?"#00A19C":"#252530"}`,
               color: tab===key?"#00A19C":"#6B6878", cursor:"pointer" }}>
             {label}
@@ -3365,7 +3365,7 @@ function ExploreScreen({ onSpotTap }) {
             {["All","Hypercar","Exotic","Sports"].map(f => (
               <button key={f} onClick={()=>setFilter(f)}
                 style={{ padding:"6px 14px", borderRadius:20, fontSize:12, fontWeight:600,
-                  background:filter===f?"#2D1200":"#18181F", border:`1px solid ${filter===f?"#00A19C":"#252530"}`,
+                  background:filter===f?"#0A2626":"#18181F", border:`1px solid ${filter===f?"#00A19C":"#252530"}`,
                   color:filter===f?"#00A19C":"#6B6878", whiteSpace:"nowrap", cursor:"pointer" }}>{f}</button>
             ))}
           </div>
@@ -3519,7 +3519,7 @@ function ProfileScreen() {
       {showNotifSettings && <NotificationSettingsSheet onClose={() => setShowNotifSettings(false)} />}
       {showAdmin         && <AdminPanel                onClose={() => setShowAdmin(false)} />}
 
-      <div style={{ background:"linear-gradient(180deg,#2D1200 0%,#14141A 100%)", padding:"24px 16px 0" }}>
+      <div style={{ background:"linear-gradient(180deg,#0A2626 0%,#14141A 100%)", padding:"24px 16px 0" }}>
         <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:12 }}>
           <button onClick={() => setShowSettings(true)}
             style={{ width:40, height:40, borderRadius:10, background:"#18181F",
@@ -3545,7 +3545,7 @@ function ProfileScreen() {
             <div style={{ fontSize:13, color:"#6B6878" }}>@{profile?.handle}</div>
             {profile?.bio && <div style={{ fontSize:12, color:"#AAA6A0", marginTop:4, maxWidth:260, lineHeight:1.4 }}>{profile.bio}</div>}
             <div style={{ marginTop:6, display:"inline-flex", alignItems:"center", gap:5,
-              background:"#2D1200", border:"1px solid #00A19C", borderRadius:6,
+              background:"#0A2626", border:"1px solid #00A19C", borderRadius:6,
               padding:"3px 10px", fontSize:11, color:"#00A19C", fontWeight:700 }}>
               🏎 Spotter
             </div>
@@ -3594,7 +3594,7 @@ function ProfileScreen() {
                 cursor:"pointer" }} onClick={() => setEditingSpot(s)}>
                 {s.image_url
                   ? <img src={s.image_url} alt="" loading="lazy" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
-                  : <div style={{ width:"100%", height:"100%", background:"#2D1200", display:"flex", alignItems:"center", justifyContent:"center", fontSize:28 }}>🏎</div>
+                  : <div style={{ width:"100%", height:"100%", background:"#0A2626", display:"flex", alignItems:"center", justifyContent:"center", fontSize:28 }}>🏎</div>
                 }
                 <div style={{ position:"absolute", inset:0, background:"linear-gradient(to bottom, transparent 60%, rgba(0,0,0,.7))" }} />
                 <div style={{ position:"absolute", bottom:4, left:4, fontFamily:"'Barlow Condensed',sans-serif", fontSize:11, fontWeight:800, color:"#fff" }}>{s.make}</div>
@@ -4093,7 +4093,7 @@ function NotificationsScreen() {  const { user, profile } = useAuth();
                 {/* Spot thumbnail placeholder */}
                 {n.spot_make && (
                   <div style={{ width:44, height:44, borderRadius:8, flexShrink:0,
-                    background:"linear-gradient(135deg,#2D1200,#1C1C24)",
+                    background:"linear-gradient(135deg,#0A2626,#1C1C24)",
                     display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>
                     🏎
                   </div>
@@ -4219,7 +4219,7 @@ function SearchScreen() {
             style={{ width:"100%", background:"#18181F", border:"1.5px solid #252530",
               borderRadius:14, padding:"11px 40px 11px 40px", color:"#F2EEE8",
               fontSize:14, outline:"none", transition:"border-color .15s",
-              ...(query ? { borderColor:"#00A19C", boxShadow:"0 0 0 3px #2D1200" } : {}) }} />
+              ...(query ? { borderColor:"#00A19C", boxShadow:"0 0 0 3px #0A2626" } : {}) }} />
           {query && (
             <button onClick={clearSearch}
               style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)",
@@ -4820,7 +4820,7 @@ function MediaGallery({ spotId, fallbackImage }) {
   }
   if (media.length === 0) {
     return (
-      <div style={{ width:"100%", aspectRatio:"1", background:"#2D1200",
+      <div style={{ width:"100%", aspectRatio:"1", background:"#0A2626",
         display:"flex", alignItems:"center", justifyContent:"center", fontSize:48 }}>🏎</div>
     );
   }
@@ -5147,7 +5147,7 @@ function CommentsSheet({ spot, onClose }) {
             <div style={{ flex:1, background:"#14141A", border:"1.5px solid #252530",
               borderRadius:22, padding:"8px 14px", display:"flex", alignItems:"center", gap:8,
               transition:"border-color .15s", position:"relative",
-              ...(text ? { borderColor:"#00A19C", boxShadow:"0 0 0 3px #2D1200" } : {}) }}>
+              ...(text ? { borderColor:"#00A19C", boxShadow:"0 0 0 3px #0A2626" } : {}) }}>
               <input
                 ref={inputRef}
                 value={text}
@@ -5432,7 +5432,7 @@ function ShareSheet({ spot, onClose }) {
           <div style={{ width:56, height:56, borderRadius:10, overflow:"hidden", flexShrink:0 }}>
             {spot.image
               ? <img src={spot.image} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
-              : <div style={{ width:"100%", height:"100%", background:"#2D1200",
+              : <div style={{ width:"100%", height:"100%", background:"#0A2626",
                   display:"flex", alignItems:"center", justifyContent:"center", fontSize:24 }}>🏎</div>
             }
           </div>
@@ -5632,7 +5632,7 @@ function OnboardingFlow({ onDone }) {
       sub:"The world's first social network built for car spotters.",
       detail:"Capture rare cars in the wild. Share your sightings. Build your reputation.",
       color:"#00A19C",
-      bg:"linear-gradient(135deg,#2D1200,#0A0A0C)",
+      bg:"linear-gradient(135deg,#0A2626,#0A0A0C)",
     },
     {
       emoji:"📸",
@@ -5768,7 +5768,7 @@ function PushNotificationBanner({ onDismiss }) {
 
   return (
     <div style={{ margin:"10px 14px 0", padding:"12px 14px",
-      background:"linear-gradient(135deg,#2D1200,#14141A)",
+      background:"linear-gradient(135deg,#0A2626,#14141A)",
       border:"1px solid #00A19C30", borderRadius:12,
       display:"flex", alignItems:"center", gap:12 }}>
       <span style={{ fontSize:22, flexShrink:0 }}>🔔</span>
