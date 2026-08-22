@@ -5,6 +5,7 @@ import { timeAgo, cachedFetch, invalidateCache } from "./lib/utils";
 import ErrorMsg from "./components/ErrorMsg";
 import Spinner from "./components/Spinner";
 import Avatar from "./components/Avatar";
+import RarityPill, { RARITY } from "./components/RarityPill";
 
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -155,11 +156,6 @@ const MOCK_SPOTS = [
     user:{ handle:"jdm_tokyo", initials:"KT", verified:true } },
 ];
 
-const RARITY = {
-  Hypercar: { bg:"#1a0a2e", text:"#b388ff", border:"#6a0dad" },
-  Exotic:   { bg:"#0A2626", text:"#00A19C", border:"#00A19C" },
-  Sports:   { bg:"#0a1a2e", text:"#60a5fa", border:"#60a5fa" },
-};
 
 const fmt = (n) => { const v = Number(n)||0; return v >= 1000 ? `${(v/1000).toFixed(1)}k` : String(v); };
 const friendlyError = (err) => {
@@ -170,14 +166,6 @@ const friendlyError = (err) => {
   return msg;
 };// ─── ATOMS ────────────────────────────────────────────────────
 
-const RarityPill = memo(({ rarity }) => {
-  const r = RARITY[rarity] || RARITY.Sports;
-  return (
-    <span style={{ background:r.bg, color:r.text, border:`1px solid ${r.border}`,
-      borderRadius:6, padding:"3px 9px", fontSize:10, fontWeight:700,
-      letterSpacing:"0.07em", textTransform:"uppercase" }}>{rarity}</span>
-  );
-});
 
 
 
