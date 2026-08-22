@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, memo, createContext, u
 import { createClient } from "@supabase/supabase-js";
 import * as Sentry from "@sentry/react";
 import { timeAgo, cachedFetch, invalidateCache } from "./lib/utils";
+import ErrorMsg from "./components/ErrorMsg";
 
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -198,12 +199,6 @@ const Spinner = ({ size=18, color="#00A19C" }) => (
     borderTopColor:color, borderRadius:"50%", flexShrink:0 }} />
 );
 
-const ErrorMsg = ({ msg }) => msg ? (
-  <div style={{ background:"rgba(239,68,68,.12)", border:"1px solid rgba(239,68,68,.3)",
-    borderRadius:8, padding:"8px 12px", fontSize:12, color:"#EF4444", marginTop:8 }}>
-    {msg}
-  </div>
-) : null;
 
 // ─── AUTH SCREENS ─────────────────────────────────────────────
 function AuthScreen() {
