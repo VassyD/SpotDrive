@@ -2027,6 +2027,7 @@ function StoriesRow({ profile, onAddStory }) {
     const load = async () => {
       const { data } = await supabase
         .from("stories_with_location_privacy")
+        .select()
         .gt("expires_at", new Date().toISOString())
         .order("created_at", { ascending: false })
         .limit(20);
@@ -2630,6 +2631,7 @@ const bottomRef   = useRef(null);
     const load = async () => {
       const data = await cachedFetch("feed-page-0", async () => {
         const { data } = await supabase.from("spots_with_location_privacy")
+          .select()
           .eq("status", "live")
           .order("created_at", { ascending: false })
           .range(0, PAGE_SIZE - 1);
@@ -3298,6 +3300,7 @@ function ExploreScreen({ onSpotTap }) {
     if (tab !== "spots") return;
     setLoadingSpots(true);
     supabase.from("spots_with_location_privacy")
+      .select()
       .eq("status", "live")
       .order("created_at", { ascending: false })
       .limit(60)
