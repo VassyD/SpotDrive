@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import * as Sentry from "@sentry/react";
 import { timeAgo, cachedFetch, invalidateCache } from "./lib/utils";
 import ErrorMsg from "./components/ErrorMsg";
+import Spinner from "./components/Spinner";
 
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -194,10 +195,6 @@ const RarityPill = memo(({ rarity }) => {
   );
 });
 
-const Spinner = ({ size=18, color="#00A19C" }) => (
-  <div className="spin" style={{ width:size, height:size, border:`2px solid ${color}30`,
-    borderTopColor:color, borderRadius:"50%", flexShrink:0 }} />
-);
 
 
 // ─── AUTH SCREENS ─────────────────────────────────────────────
