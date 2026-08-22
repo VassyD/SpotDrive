@@ -2026,8 +2026,7 @@ function StoriesRow({ profile, onAddStory }) {
     // Load from Supabase, fall back to mock
     const load = async () => {
       const { data } = await supabase
-        .from("stories")
-        .select("*, profiles(handle, avatar_url, display_name)")
+        .from("stories_with_location_privacy")
         .gt("expires_at", new Date().toISOString())
         .order("created_at", { ascending: false })
         .limit(20);
@@ -2630,8 +2629,7 @@ const bottomRef   = useRef(null);
   useEffect(() => {
     const load = async () => {
       const data = await cachedFetch("feed-page-0", async () => {
-        const { data } = await supabase.from("spots")
-          .select("*, profiles(handle, avatar_url, display_name)")
+        const { data } = await supabase.from("spots_with_location_privacy")
           .eq("status", "live")
           .order("created_at", { ascending: false })
           .range(0, PAGE_SIZE - 1);
@@ -3299,8 +3297,7 @@ function ExploreScreen({ onSpotTap }) {
   useEffect(() => {
     if (tab !== "spots") return;
     setLoadingSpots(true);
-    supabase.from("spots")
-      .select("*, profiles(handle, avatar_url, display_name)")
+    supabase.from("spots_with_location_privacy")
       .eq("status", "live")
       .order("created_at", { ascending: false })
       .limit(60)
