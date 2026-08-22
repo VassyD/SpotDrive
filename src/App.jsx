@@ -2035,9 +2035,9 @@ function StoriesRow({ profile, onAddStory }) {
       if (data && data.length > 0) {
         setStories(data.map(s => ({
           id:        s.id,
-          handle:    s.profiles?.handle || "spotter",
-          initials:  (s.profiles?.handle || "SP").slice(0,2).toUpperCase(),
-          avatar_url:s.profiles?.avatar_url,
+          handle:    s.handle || "spotter",
+          initials:  (s.handle || "SP").slice(0,2).toUpperCase(),
+          avatar_url:s.avatar_url,
           image:     s.image_url,
           make:      s.make,
           model:     s.model,
@@ -2607,10 +2607,10 @@ const bottomRef   = useRef(null);
     liked:    false,
     saved:    false,
     user: {
-      handle:    s.profiles?.handle     || "spotter",
-      display_name: s.profiles?.display_name || s.profiles?.handle || "spotter",
-      avatar_url:s.profiles?.avatar_url,
-      initials:  (s.profiles?.handle    || "SP").slice(0,2).toUpperCase(),
+      handle:    s.handle     || "spotter",
+      display_name: s.display_name || s.handle || "spotter",
+      avatar_url:s.avatar_url,
+      initials:  (s.handle    || "SP").slice(0,2).toUpperCase(),
     },
   });
 
