@@ -3179,6 +3179,13 @@ function SpotterProfileSheet({ handle, onClose }) {
                       </div>
                     )}
                     {spotter.bio && <div style={{ fontSize:12, color:"#AAA6A0", lineHeight:1.4, marginBottom:8 }}>{spotter.bio}</div>}
+                    {spotter.verified_spotter_at && (
+                      <div style={{ display:"inline-flex", alignItems:"center", gap:5,
+                        background:"#0A2626", border:"1px solid #00A19C", borderRadius:6,
+                        padding:"3px 10px", fontSize:11, color:"#00A19C", fontWeight:700, marginBottom:8 }}>
+                        ✅ Verified Spotter
+                      </div>
+                    )}
                     <div style={{ display:"flex", gap:8 }}>
                       <FollowButton targetUserId={spotter.id} targetHandle={spotter.handle} />
                       {user && spotter && user.id !== spotter.id && (
@@ -3544,10 +3551,19 @@ function ProfileScreen() {
             </div>
             <div style={{ fontSize:13, color:"#6B6878" }}>@{profile?.handle}</div>
             {profile?.bio && <div style={{ fontSize:12, color:"#AAA6A0", marginTop:4, maxWidth:260, lineHeight:1.4 }}>{profile.bio}</div>}
-            <div style={{ marginTop:6, display:"inline-flex", alignItems:"center", gap:5,
-              background:"#0A2626", border:"1px solid #00A19C", borderRadius:6,
-              padding:"3px 10px", fontSize:11, color:"#00A19C", fontWeight:700 }}>
-              🏎 Spotter
+            <div style={{ marginTop:6, display:"flex", gap:6, flexWrap:"wrap" }}>
+              <div style={{ display:"inline-flex", alignItems:"center", gap:5,
+                background:"#0A2626", border:"1px solid #00A19C", borderRadius:6,
+                padding:"3px 10px", fontSize:11, color:"#00A19C", fontWeight:700 }}>
+                🏎 Spotter
+              </div>
+              {profile?.verified_spotter_at && (
+                <div style={{ display:"inline-flex", alignItems:"center", gap:5,
+                  background:"#0A2626", border:"1px solid #00A19C", borderRadius:6,
+                  padding:"3px 10px", fontSize:11, color:"#00A19C", fontWeight:700 }}>
+                  ✅ Verified Spotter
+                </div>
+              )}
             </div>
           </div>
         </div>
