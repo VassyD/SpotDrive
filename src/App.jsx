@@ -4,6 +4,7 @@ import * as Sentry from "@sentry/react";
 import { timeAgo, cachedFetch, invalidateCache } from "./lib/utils";
 import ErrorMsg from "./components/ErrorMsg";
 import Spinner from "./components/Spinner";
+import Avatar from "./components/Avatar";
 
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -168,23 +169,6 @@ const friendlyError = (err) => {
   }
   return msg;
 };// ─── ATOMS ────────────────────────────────────────────────────
-const Avatar = memo(({ initials, src, size=36, ring=false }) => {
-  const [err, setErr] = useState(false);
-  const fs = Math.round(size * 0.36);
-  return (
-    <div style={{ width:size, height:size, borderRadius:"50%", flexShrink:0, overflow:"hidden",
-      background:"linear-gradient(135deg,#00A19C,#7c1a02)",
-      display:"flex", alignItems:"center", justifyContent:"center",
-      fontSize:fs, fontWeight:700, color:"#fff",
-      boxShadow: ring ? "0 0 0 2px #0A0A0C,0 0 0 4px #00A19C" : "none" }}>
-      {src && !err
-        ? <img src={src} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}
-            onError={() => setErr(true)} />
-        : (initials || "?").slice(0,2).toUpperCase()
-      }
-    </div>
-  );
-});
 
 const RarityPill = memo(({ rarity }) => {
   const r = RARITY[rarity] || RARITY.Sports;
