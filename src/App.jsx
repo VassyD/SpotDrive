@@ -1439,8 +1439,7 @@ function EditProfileSheet({ onClose }) {
         .eq("id", user.id);
       if (err) throw err;
       const { error:privErr } = await supabase.from("profile_private_info")
-        .update({ town:form.town, state:form.state, country:form.country })
-        .eq("user_id", user.id);
+        .upsert({ user_id: user.id, town:form.town, state:form.state, country:form.country }, { onConflict: "user_id" });
       if (privErr) throw privErr;
       await fetchProfile(user.id);
       setSuccess(true);
