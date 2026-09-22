@@ -3322,9 +3322,9 @@ function ExploreScreen({ onSpotTap }) {
                   <div style={{ display:"flex", alignItems:"center", gap:6 }}>
                     <span style={{ fontSize:14, fontWeight:700, color:"#F2EEE8",
                       overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                      @{spotter.handle}
+                      {spotter.display_name || spotter.handle}
                     </span>
-                    {spotter.is_verified && <span style={{ fontSize:13 }}>✅</span>}
+                    {spotter.verified_spotter_at && <span style={{ fontSize:13 }}>✅</span>}
                   </div>
                   <div style={{ fontSize:12, color:"#6B6878" }}>@{spotter.handle}</div>
                   <div style={{ display:"flex", gap:10, marginTop:3 }}>
