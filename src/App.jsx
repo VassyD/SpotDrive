@@ -1412,10 +1412,22 @@ function EditProfileSheet({ onClose }) {
     display_name: profile?.display_name||"",
     handle:       profile?.handle||"",
     bio:          profile?.bio||"",
+    town:         "",
+    state:        "",
+    country:      "",
   });
   const [saving,  setSaving]  = useState(false);
   const [error,   setError]   = useState("");
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("profile_private_info").select("town, state, country")
+      .eq("user_id", user.id).maybeSingle()
+      .then(({ data }) => {
+        if (data) setForm(p => ({ ...p, town: data.town || "", state: data.state || "", country: data.country || "" }));
+      });
+  }, [user]);
 
   const save = async () => {
     if (!form.handle) { setError("Handle is required."); return; }
@@ -1426,6 +1438,10 @@ function EditProfileSheet({ onClose }) {
         .update({ display_name:form.display_name, handle:form.handle.toLowerCase(), bio:form.bio })
         .eq("id", user.id);
       if (err) throw err;
+      const { error:privErr } = await supabase.from("profile_private_info")
+        .update({ town:form.town, state:form.state, country:form.country })
+        .eq("user_id", user.id);
+      if (privErr) throw privErr;
       await fetchProfile(user.id);
       setSuccess(true);
       setTimeout(onClose, 1000);
@@ -1449,6 +1465,9 @@ function EditProfileSheet({ onClose }) {
             { key:"display_name", label:"Display Name", placeholder:"Your name", textarea:false },
             { key:"handle",       label:"Username",     placeholder:"your_handle", textarea:false },
             { key:"bio",          label:"Bio",          placeholder:"Tell spotters about yourself…", textarea:true },
+            { key:"town",         label:"Town / City",  placeholder:"e.g. Adelaide", textarea:false },
+            { key:"state",        label:"State",        placeholder:"e.g. South Australia", textarea:false },
+            { key:"country",      label:"Country",      placeholder:"e.g. Australia", textarea:false },
           ].map(({ key, label, placeholder, textarea }) => (
             <div key={key}>
               <label style={{ fontSize:11, color:"#6B6878", fontWeight:600, textTransform:"uppercase", letterSpacing:".05em", display:"block", marginBottom:5 }}>{label}</label>
