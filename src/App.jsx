@@ -5102,13 +5102,13 @@ function LeaderboardScreen() {
     const load = async () => {
       if (tab === "global") {
         const { data } = await supabase.from("profiles")
-          .select("id, handle, avatar_url, followers_count, spots_count")
+          .select("id, handle, avatar_url, display_name, followers_count, spots_count")
           .eq("show_leaderboard", true)
           .order("followers_count", { ascending: false })
           .limit(50);
         const ranked = (data || [])
           .map(p => ({
-            handle: p.handle, avatar_url: p.avatar_url,
+            handle: p.handle, avatar_url: p.avatar_url, display_name: p.display_name || p.handle,
             spots: p.spots_count || 0, followers: p.followers_count || 0,
             score: (p.followers_count || 0) * 2 + (p.spots_count || 0) * 10,
             initials: (p.handle || "SP").slice(0, 2).toUpperCase(),
@@ -5123,6 +5123,7 @@ function LeaderboardScreen() {
         const { data } = await supabase.rpc("get_city_leaderboard", { target_city: myTown });
         const ranked = (data || []).map((s, i) => ({
           handle: s.handle || "spotter",
+          display_name: s.display_name || s.handle || "spotter",
           avatar_url: s.avatar_url,
           initials: (s.handle || "SP").slice(0, 2).toUpperCase(),
           spots: Number(s.spot_count) || 0,
@@ -5135,7 +5136,7 @@ function LeaderboardScreen() {
       } else {
         const rarity = RARITY_MAP[tab];
         const { data } = await supabase.from("spots")
-          .select("user_id, profiles!inner(handle, avatar_url, show_leaderboard)")
+          .select("user_id, profiles!inner(handle, avatar_url, display_name, show_leaderboard)")
           .eq("profiles.show_leaderboard", true)
           .eq("status", "live")
           .eq("rarity", rarity)
@@ -5145,6 +5146,7 @@ function LeaderboardScreen() {
           const uid = s.user_id;
           if (!counts[uid]) counts[uid] = {
             handle: s.profiles?.handle || "spotter",
+            display_name: s.profiles?.display_name || s.profiles?.handle || "spotter",
             avatar_url: s.profiles?.avatar_url,
             initials: (s.profiles?.handle || "SP").slice(0, 2).toUpperCase(),
             spots: 0,
@@ -5284,7 +5286,7 @@ function LeaderboardScreen() {
             <div style={{ flex:1, minWidth:0 }}>
               <div style={{ fontSize:14, fontWeight:700, color:"#F2EEE8",
                 overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", display:"flex", alignItems:"center", gap:4 }}>
-                @{s.handle}
+                {s.display_name || s.handle}
                 {s.verified_spotter_at && <span style={{ color:"#00A19C", fontSize:12 }}>✅</span>}
               </div>
               <div style={{ fontSize:11, color:"#6B6878" }}>
