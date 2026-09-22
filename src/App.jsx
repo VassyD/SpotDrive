@@ -5087,8 +5087,15 @@ function LeaderboardScreen() {
   const [spotters,setSpotters]= useState([]);
   const [loading, setLoading] = useState(true);
   const [viewProfile, setViewProfile] = useState(null);
+  const [myTown, setMyTown] = useState(undefined); // undefined = resolving, null = confirmed none, string = has one
 
   const RARITY_MAP = { hypercar: "Hypercar", exotic: "Exotic", sports: "Sports" };
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("profile_private_info").select("town").eq("user_id", user.id).maybeSingle()
+      .then(({ data }) => setMyTown(data?.town || null));
+  }, [user]);
 
   useEffect(() => {
     setLoading(true);
@@ -5109,6 +5116,21 @@ function LeaderboardScreen() {
           .sort((a, b) => b.score - a.score)
           .slice(0, 10)
           .map((s, i) => ({ ...s, rank: i + 1, badge: i===0?"🏆":i===1?"🥈":i===2?"🥉":"" }));
+        setSpotters(ranked);
+      } else if (tab === "city") {
+        if (myTown === undefined) { return; } // still resolving the viewer's own town
+        if (!myTown) { setSpotters([]); setLoading(false); return; }
+        const { data } = await supabase.rpc("get_city_leaderboard", { target_city: myTown });
+        const ranked = (data || []).map((s, i) => ({
+          handle: s.handle || "spotter",
+          avatar_url: s.avatar_url,
+          initials: (s.handle || "SP").slice(0, 2).toUpperCase(),
+          spots: Number(s.spot_count) || 0,
+          score: Number(s.spot_count) || 0,
+          verified_spotter_at: s.verified_spotter_at,
+          rank: i + 1,
+          badge: i===0?"🏆":i===1?"🥈":i===2?"🥉":"",
+        }));
         setSpotters(ranked);
       } else {
         const rarity = RARITY_MAP[tab];
@@ -5138,11 +5160,12 @@ function LeaderboardScreen() {
       setLoading(false);
     };
     load();
-  }, [tab]);
+  }, [tab, myTown]);
   const leaders = spotters;
 
   const TABS = [
     { key:"global",   label:"🌍 Global"   },
+    { key:"city",     label:"🏙️ City"     },
     { key:"hypercar", label:"👑 Hypercar" },
     { key:"exotic",   label:"🔥 Exotic"   },
     { key:"sports",   label:"🏁 Sports"   },
@@ -5177,6 +5200,13 @@ function LeaderboardScreen() {
         ))}
       </div>
 
+      {tab === "city" && myTown === null ? (
+        <div style={{ textAlign:"center", padding:"60px 20px" }}>
+          <div style={{ fontSize:36, marginBottom:10 }}>📍</div>
+          <div style={{ fontSize:15, color:"#F2EEE8", fontWeight:700, marginBottom:6 }}>Set your town to see your local leaderboard</div>
+          <div style={{ fontSize:13, color:"#6B6878" }}>Add it in Settings → Edit Profile.</div>
+        </div>
+      ) : (<>
       {/* Top 3 podium */}
       {!loading && leaders.length >= 3 && (
         <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"center",
@@ -5253,8 +5283,9 @@ function LeaderboardScreen() {
             <Avatar initials={s.initials} src={s.avatar_url} size={44} />
             <div style={{ flex:1, minWidth:0 }}>
               <div style={{ fontSize:14, fontWeight:700, color:"#F2EEE8",
-                overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", display:"flex", alignItems:"center", gap:4 }}>
                 @{s.handle}
+                {s.verified_spotter_at && <span style={{ color:"#00A19C", fontSize:12 }}>✅</span>}
               </div>
               <div style={{ fontSize:11, color:"#6B6878" }}>
                 @{s.handle}
@@ -5272,6 +5303,7 @@ function LeaderboardScreen() {
           </div>
         ))}
       </div>
+      </>)}
 
       {viewProfile && <SpotterProfileSheet handle={viewProfile} onClose={() => setViewProfile(null)} />}
     </div>
