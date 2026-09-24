@@ -13,7 +13,7 @@ const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
 if (!SUPABASE_URL || !SUPABASE_ANON) {
   throw new Error("Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY - check your .env file.");
 }
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
 
 const T = {
   bg:"#0A0A0C", surface:"#14141A", surfaceHi:"#1C1C24", card:"#18181F",
@@ -627,8 +627,12 @@ const handleReport = async (reason) => {
 
 
 // ─── UPLOAD MODAL (with autocomplete) ─────────────────────────
+import { useLocationCoarsening } from "./hooks/useLocationCoarsening";
+
 function UploadModal({ onClose }) {
   const { user } = useAuth();
+  const { resolveLocation, resolving: resolvingLocation } = useLocationCoarsening();
+  const [locationError, setLocationError] = useState("");
   const [step,       setStep]       = useState(1);
   const [mediaItems, setMediaItems] = useState([]); // [{ file, previewUrl, type }]
   const [form,    setForm]    = useState({ make:"", model:"", year:"", rarity:"Exotic", location:"", desc:"" });
@@ -689,10 +693,19 @@ function UploadModal({ onClose }) {
       }
       const coverImage = uploaded.find(u => u.type === "image")?.url || null;
 
+      // Safety re-resolve, independent of whether blur-time resolution already
+      // ran - guarantees the saved value always comes from a fresh, successful
+      // geocode call, never raw text (idempotent if already coarse).
+      let finalLocation = null;
+      if (form.location.trim()) {
+        const locResult = await resolveLocation(form.location);
+        finalLocation = locResult.success ? locResult.location : null;
+      }
+
       const { error: insertErr } = await supabase.from("spots").insert({
         id: spotId, user_id:user.id, make:form.make, model:form.model,
         year:parseInt(form.year)||new Date().getFullYear(),
-        rarity:form.rarity, color:"", location_name:form.location,
+        rarity:form.rarity, color:"", location_name:finalLocation,
         description:form.desc, image_url:coverImage, status:"live",
       });
       if (insertErr) throw insertErr;
@@ -778,13 +791,26 @@ function UploadModal({ onClose }) {
                 <ModelInput make={form.make} value={form.model} onChange={v => setForm(p=>({...p, model:v}))} placeholder="SF90 Stradale" />
               </div>
 
-              {/* Year + Location */}
-              {[{key:"year",label:"Year",ph:"2023"},{key:"location",label:"Location",ph:"Monaco, Monte Carlo"}].map(({key,label,ph}) => (
-                <div key={key}>
-                  <label style={{ fontSize:11, color:"#6B6878", fontWeight:600, textTransform:"uppercase", letterSpacing:".05em", display:"block", marginBottom:5 }}>{label}</label>
-                  <input className="sd-input" value={form[key]} placeholder={ph} onChange={e=>setForm(p=>({...p,[key]:e.target.value}))} />
-                </div>
-              ))}
+              {/* Year */}
+              <div>
+                <label style={{ fontSize:11, color:"#6B6878", fontWeight:600, textTransform:"uppercase", letterSpacing:".05em", display:"block", marginBottom:5 }}>Year</label>
+                <input className="sd-input" value={form.year} placeholder="2023" onChange={e=>setForm(p=>({...p,year:e.target.value}))} />
+              </div>
+
+              {/* Location - resolved to a coarse town/region on blur, never stores raw text */}
+              <div>
+                <label style={{ fontSize:11, color:"#6B6878", fontWeight:600, textTransform:"uppercase", letterSpacing:".05em", display:"block", marginBottom:5 }}>Location</label>
+                <input className="sd-input" value={form.location} placeholder="Monaco, Monte Carlo"
+                  onChange={e=>{ setForm(p=>({...p,location:e.target.value})); setLocationError(""); }}
+                  onBlur={async () => {
+                    if (!form.location.trim()) return;
+                    const result = await resolveLocation(form.location);
+                    if (result.success) { setForm(p=>({...p, location: result.location || ""})); setLocationError(""); }
+                    else { setLocationError(result.fallback); }
+                  }} />
+                {resolvingLocation && <div style={{ fontSize:11, color:"#6B6878", marginTop:4 }}>Resolving location…</div>}
+                {locationError && <div style={{ fontSize:11, color:"#EF4444", marginTop:4 }}>{locationError}</div>}
+              </div>
 
               <div>
                 <label style={{ fontSize:11, color:"#6B6878", fontWeight:600, textTransform:"uppercase", letterSpacing:".05em", display:"block", marginBottom:5 }}>Rarity</label>
