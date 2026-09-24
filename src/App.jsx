@@ -138,25 +138,6 @@ function AuthProvider({ children }) {
 
 const useAuth = () => useContext(AuthContext);
 
-// ─── MOCK DATA ────────────────────────────────────────────────
-const MOCK_SPOTS = [
-  { id:"s1", make:"Lamborghini", model:"Huracán STO", year:2023, rarity:"Exotic", color:"Verde Mantis",
-    location:"Rodeo Drive, Beverly Hills", image:"https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=600&q=75&fm=webp",
-    likes:2841, comments:94, saves:312, time:"12m ago", tags:["Lamborghini","STO","TrackSpecial"],
-    liked:false, saved:false, description:"Caught this STO parked outside Gucci. Verde Mantis in person is something else.",
-    user:{ handle:"apex_hunter", initials:"AH", verified:true } },
-  { id:"s2", make:"Ferrari", model:"SF90 Stradale", year:2022, rarity:"Hypercar", color:"Rosso Corsa",
-    location:"Monaco, Monte Carlo", image:"https://images.unsplash.com/photo-1583121274602-3e2820c69888?w=600&q=75&fm=webp",
-    likes:5102, comments:218, saves:891, time:"1h ago", tags:["Ferrari","SF90","Hybrid"],
-    liked:true, saved:false, description:"SF90 rolling out of Casino Square. Rosso Corsa with Assetto Fiorano pack.",
-    user:{ handle:"euro_spotter", initials:"LM", verified:false } },
-  { id:"s3", make:"Bugatti", model:"Chiron Super Sport", year:2023, rarity:"Hypercar", color:"Atlantic Blue",
-    location:"Shibuya, Tokyo", image:"https://images.unsplash.com/photo-1525609004556-c46c7d6cf023?w=600&q=75&fm=webp",
-    likes:9441, comments:507, saves:2103, time:"3h ago", tags:["Bugatti","Chiron","1500HP"],
-    liked:false, saved:true, description:"Never thought I'd see a Chiron SS in Shibuya. The W16 sound was insane.",
-    user:{ handle:"jdm_tokyo", initials:"KT", verified:true } },
-];
-
 
 const fmt = (n) => { const v = Number(n)||0; return v >= 1000 ? `${(v/1000).toFixed(1)}k` : String(v); };
 const friendlyError = (err) => {
@@ -1925,13 +1906,6 @@ const loadOffenders = useCallback(async () => {
 
 
 // ─── STORIES ──────────────────────────────────────────────────
-const MOCK_STORIES = [
-  { id:"st1", handle:"jdm_tokyo",    initials:"KT", image:"https://images.unsplash.com/photo-1525609004556-c46c7d6cf023?w=600&q=75&fm=webp", make:"Bugatti",     model:"Chiron SS",    rarity:"Hypercar", location:"Shibuya, Tokyo",       viewed:false, expiresAt: Date.now() + 18*3600000 },
-  { id:"st2", handle:"euro_spotter", initials:"LM", image:"https://images.unsplash.com/photo-1583121274602-3e2820c69888?w=600&q=75&fm=webp", make:"Ferrari",      model:"SF90",         rarity:"Hypercar", location:"Monaco",               viewed:false, expiresAt: Date.now() + 12*3600000 },
-  { id:"st3", handle:"apex_hunter",  initials:"AH", image:"https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=600&q=75&fm=webp",  make:"Lamborghini",  model:"Huracán STO",  rarity:"Exotic",   location:"Beverly Hills",        viewed:true,  expiresAt: Date.now() + 6*3600000  },
-  { id:"st4", handle:"gulf_spots",   initials:"OR", image:"https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=600&q=75&fm=webp",  make:"McLaren",      model:"765LT",        rarity:"Exotic",   location:"Dubai Marina",         viewed:false, expiresAt: Date.now() + 20*3600000 },
-  { id:"st5", handle:"la_spotter",   initials:"MW", image:"https://images.unsplash.com/photo-1493238792000-8113da705763?w=600&q=75&fm=webp",make:"Porsche",      model:"GT3 RS",       rarity:"Sports",   location:"Santa Monica",         viewed:true,  expiresAt: Date.now() + 3*3600000  },
-];
 
 function StoriesRow({ profile, onAddStory }) {
   const [stories, setStories] = useState([]);
