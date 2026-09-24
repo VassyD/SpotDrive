@@ -2322,6 +2322,8 @@ function StoryUploadModal({ onClose }) {
   const [form,    setForm]    = useState({ make:"", model:"", rarity:"Exotic", location:"" });
   const [posting, setPosting] = useState(false);
   const [done,    setDone]    = useState(false);
+  const { resolveLocation, resolving: resolvingLocation } = useLocationCoarsening();
+  const [locationError, setLocationError] = useState("");
   const [error,   setError]   = useState("");
   const fileRef = useRef();
   const blobRef = useRef(null);
@@ -2346,13 +2348,20 @@ function StoryUploadModal({ onClose }) {
       const { data: { publicUrl } } = supabase.storage.from("spot-photos").getPublicUrl(path);
 
       const expiresAt = new Date(Date.now() + 24*3600000).toISOString();
+
+      let finalLocation = null;
+      if (form.location.trim()) {
+        const locResult = await resolveLocation(form.location);
+        finalLocation = locResult.success ? locResult.location : null;
+      }
+
       const { error: insErr } = await supabase.from("stories").insert({
         user_id:      user.id,
         image_url:    publicUrl,
         make:         form.make,
         model:        form.model,
         rarity:       form.rarity,
-        location_name:form.location,
+        location_name:finalLocation,
         expires_at:   expiresAt,
       });
       if (insErr) throw insErr;
@@ -2415,9 +2424,8 @@ function StoryUploadModal({ onClose }) {
 
               {/* Fields */}
               {[
-                { key:"make",     label:"Make",     ph:"Ferrari"  },
-                { key:"model",    label:"Model",    ph:"SF90"     },
-                { key:"location", label:"Location", ph:"Monaco"   },
+                { key:"make",  label:"Make",  ph:"Ferrari" },
+                { key:"model", label:"Model", ph:"SF90"    },
               ].map(({ key, label, ph }) => (
                 <div key={key}>
                   <label style={{ fontSize:11, color:"#6B6878", fontWeight:600,
@@ -2428,6 +2436,24 @@ function StoryUploadModal({ onClose }) {
                     onChange={e => setForm(p => ({ ...p, [key]:e.target.value }))} />
                 </div>
               ))}
+
+              {/* Location - resolved to a coarse town/region on blur, never stores raw text */}
+              <div>
+                <label style={{ fontSize:11, color:"#6B6878", fontWeight:600,
+                  textTransform:"uppercase", letterSpacing:".05em", display:"block", marginBottom:5 }}>
+                  Location
+                </label>
+                <input className="sd-input" placeholder="Monaco" value={form.location}
+                  onChange={e => { setForm(p => ({ ...p, location:e.target.value })); setLocationError(""); }}
+                  onBlur={async () => {
+                    if (!form.location.trim()) return;
+                    const result = await resolveLocation(form.location);
+                    if (result.success) { setForm(p=>({ ...p, location: result.location || "" })); setLocationError(""); }
+                    else { setLocationError(result.fallback); }
+                  }} />
+                {resolvingLocation && <div style={{ fontSize:11, color:"#6B6878", marginTop:4 }}>Resolving location…</div>}
+                {locationError && <div style={{ fontSize:11, color:"#EF4444", marginTop:4 }}>{locationError}</div>}
+              </div>
 
               {/* Rarity */}
               <div>
@@ -5449,13 +5475,20 @@ function EditSpotModal({ spot, onClose, onDeleted }) {
   const [confirm,  setConfirm]  = useState(false);
   const [error,    setError]    = useState("");
   const [saved,    setSaved]    = useState(false);
+  const { resolveLocation, resolving: resolvingLocation } = useLocationCoarsening();
+  const [locationError, setLocationError] = useState("");
 
   const save = async () => {
     setSaving(true); setError("");
     try {
+      let finalLocation = null;
+      if (form.location.trim()) {
+        const locResult = await resolveLocation(form.location);
+        finalLocation = locResult.success ? locResult.location : null;
+      }
       const { error:err } = await supabase.from("spots")
         .update({ make:form.make, model:form.model,
-          location_name:form.location, description:form.desc, rarity:form.rarity })
+          location_name:finalLocation, description:form.desc, rarity:form.rarity })
         .eq("id", spot.id).eq("user_id", user.id);
       if (err) throw err;
       setSaved(true);
@@ -5494,9 +5527,8 @@ function EditSpotModal({ spot, onClose, onDeleted }) {
               style={{ width:"100%", height:160, objectFit:"cover", borderRadius:12 }} />
           )}
           {[
-            { key:"make",     label:"Make",     ph:spot.make     },
-            { key:"model",    label:"Model",    ph:spot.model    },
-            { key:"location", label:"Location", ph:spot.location },
+            { key:"make",  label:"Make",  ph:spot.make  },
+            { key:"model", label:"Model", ph:spot.model },
           ].map(({ key, label, ph }) => (
             <div key={key}>
               <label style={{ fontSize:11, color:"#6B6878", fontWeight:600,
@@ -5507,6 +5539,24 @@ function EditSpotModal({ spot, onClose, onDeleted }) {
                 onChange={e => setForm(p => ({ ...p, [key]:e.target.value }))} />
             </div>
           ))}
+
+          {/* Location - re-resolved to a coarse town/region on blur, same as posting */}
+          <div>
+            <label style={{ fontSize:11, color:"#6B6878", fontWeight:600,
+              textTransform:"uppercase", letterSpacing:".05em", display:"block", marginBottom:5 }}>
+              Location
+            </label>
+            <input className="sd-input" value={form.location} placeholder={spot.location}
+              onChange={e => { setForm(p => ({ ...p, location:e.target.value })); setLocationError(""); }}
+              onBlur={async () => {
+                if (!form.location.trim()) return;
+                const result = await resolveLocation(form.location);
+                if (result.success) { setForm(p=>({ ...p, location: result.location || "" })); setLocationError(""); }
+                else { setLocationError(result.fallback); }
+              }} />
+            {resolvingLocation && <div style={{ fontSize:11, color:"#6B6878", marginTop:4 }}>Resolving location…</div>}
+            {locationError && <div style={{ fontSize:11, color:"#EF4444", marginTop:4 }}>{locationError}</div>}
+          </div>
           <div>
             <label style={{ fontSize:11, color:"#6B6878", fontWeight:600,
               textTransform:"uppercase", letterSpacing:".05em", display:"block", marginBottom:5 }}>
