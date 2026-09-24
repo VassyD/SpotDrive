@@ -1938,16 +1938,18 @@ function StoriesRow({ profile, onAddStory }) {
   const [viewing, setViewing] = useState(null); // index into stories
 
   useEffect(() => {
-    // Load from Supabase, fall back to mock
+    // Load real stories only - no mock fallback, on error or genuinely
+    // empty results alike. Degrades gracefully either way, since the
+    // "Add Story" prompt always renders regardless of stories.length.
     const load = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("stories_with_location_privacy")
         .select()
         .gt("expires_at", new Date().toISOString())
         .order("created_at", { ascending: false })
         .limit(20);
 
-      if (data && data.length > 0) {
+      if (!error && data) {
         setStories(data.map(s => ({
           id:        s.id,
           handle:    s.handle || "spotter",
@@ -1961,8 +1963,6 @@ function StoriesRow({ profile, onAddStory }) {
           viewed:    false,
           expiresAt: new Date(s.expires_at).getTime(),
         })));
-      } else {
-        setStories(MOCK_STORIES);
       }
     };
     load();
@@ -2515,6 +2515,7 @@ function FeedScreen({ onSpotTap }) {
   const { user, profile } = useAuth();
   const [spots,         setSpots]         = useState([]);
   const [loading,       setLoading]       = useState(true);
+  const [loadError,     setLoadError]     = useState(false);
   const [loadingMore,   setLoadingMore]   = useState(false);
   const [hasMore,       setHasMore]       = useState(true);
   const [page,          setPage]          = useState(0);
@@ -2567,24 +2568,31 @@ const bottomRef   = useRef(null);
     return mapped.map(s => ({ ...s, liked: likedSet.has(s.id), saved: savedSet.has(s.id) }));
   };
 
-  // Initial load with cache
+  // Initial load - deliberately bypasses the cache. A generic cache
+  // wrapper cannot distinguish success from failure, so caching an
+  // error result risks a stale failure - or a silently-cached null
+  // misread later as "genuinely empty" - persisting past the actual
+  // outage, with no real retry ever happening.
   useEffect(() => {
     const load = async () => {
-      const data = await cachedFetch("feed-page-0", async () => {
-        const { data } = await supabase.from("spots_with_location_privacy")
-          .select()
-          .eq("status", "live")
-          .order("created_at", { ascending: false })
-          .range(0, PAGE_SIZE - 1);
-        return data;
-      });
+      const { data, error } = await supabase.from("spots_with_location_privacy")
+        .select()
+        .eq("status", "live")
+        .order("created_at", { ascending: false })
+        .range(0, PAGE_SIZE - 1);
 
-     if (data && data.length > 0) {
+      if (error) {
+        setLoadError(true);
+        setSpots([]);
+        setHasMore(false);
+      } else if (data && data.length > 0) {
+        setLoadError(false);
         const mapped = await applyLikedSaved(data.map(mapSpot));
         setSpots(mapped);
         setHasMore(data.length === PAGE_SIZE);
       } else {
-        setSpots(MOCK_SPOTS.map(s => ({ ...s, image: imgUrl(s.image, 600) })));
+        setLoadError(false);
+        setSpots([]);
         setHasMore(false);
       }
       setLoading(false);
@@ -2696,7 +2704,23 @@ const bottomRef   = useRef(null);
                 </div>
               </div>
             ))
-        : spots.map(s => <SpotCard key={s.id} spot={s} onTap={onSpotTap}
+        : loadError ? (
+          <div style={{ textAlign:"center", padding:"60px 20px" }}>
+            <div style={{ fontSize:36, marginBottom:10 }}>⚠️</div>
+            <div style={{ fontSize:15, color:"#F2EEE8", fontWeight:700, marginBottom:6 }}>Couldn't load your feed</div>
+            <div style={{ fontSize:13, color:"#6B6878", marginBottom:16 }}>Check your connection and try again.</div>
+            <button className="sd-btn sd-btn-primary" style={{ maxWidth:160, margin:"0 auto" }}
+              onClick={() => window.location.reload()}>
+              Try again
+            </button>
+          </div>
+        ) : spots.length === 0 ? (
+          <div style={{ textAlign:"center", padding:"60px 20px" }}>
+            <div style={{ fontSize:36, marginBottom:10 }}>🏎️</div>
+            <div style={{ fontSize:15, color:"#F2EEE8", fontWeight:700, marginBottom:6 }}>No spots yet</div>
+            <div style={{ fontSize:13, color:"#6B6878" }}>Follow other spotters, or be the first to post today.</div>
+          </div>
+        ) : spots.map(s => <SpotCard key={s.id} spot={s} onTap={onSpotTap}
              onLikeChange={(id, liked, likes) => setSpots(prev => prev.map(sp => sp.id === id ? { ...sp, liked, likes } : sp))}
               onSaveChange={(id, saved, saves) => setSpots(prev => prev.map(sp => sp.id === id ? { ...sp, saved, saves } : sp))}
               onUserTap={(handle) => setViewProfile(handle)}
