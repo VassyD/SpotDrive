@@ -2653,13 +2653,6 @@ const bottomRef   = useRef(null);
 
       {showPushBanner && <PushNotificationBanner onDismiss={() => setShowPushBanner(false)} />}
 
-      <div style={{ margin:"10px 14px", padding:"10px 14px", background:"#0A2626",
-        border:"1px solid rgba(0,161,156,.3)", borderRadius:12,
-        display:"flex", alignItems:"center", gap:8, fontSize:13 }}>
-        <span>🔥</span>
-        <span style={{ color:"#F2EEE8", fontWeight:600 }}>Trending: </span>
-        <span style={{ color:"#6B6878" }}>Bugatti Chiron SS in Tokyo · 9.4k likes</span>
-      </div>
 
       <div style={{ display:"flex", flexDirection:"column", gap:14, padding:"0 14px 14px" }}>
         {loading
